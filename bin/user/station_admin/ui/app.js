@@ -397,7 +397,16 @@ logout.addEventListener('click', async () => {
 });
 
 (async () => {
-  const session = await api('session');
+  // A reload can hit the seconds in which an update restarts this server.
+  let session;
+  while (!session) {
+    try {
+      session = await api('session');
+    } catch (error) {
+      page.replaceChildren(el('p', {class: 'note', text: 'Waiting for the administration.'}));
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
   if (!session.password_set) showFirstStart();
   else if (session.authenticated) showApplication('Status');
   else showLogin();
