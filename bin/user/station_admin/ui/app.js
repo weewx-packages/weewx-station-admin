@@ -137,8 +137,10 @@ const views = {
   },
 
   async Station() {
-    const {values: current, address, configured, timezone} = await api('station');
+    const {values: current, address, configured, timezone, languages} = await api('station');
     const zone = !configured && Intl.DateTimeFormat().resolvedOptions().timeZone || timezone;
+    const browserLanguage = navigator.language.replace('-', '_') + '.UTF-8';
+    const language = !configured && browserLanguage in languages ? browserLanguage : current.language;
     const driverBox = el('div');
     const drawDriver = driver => {
       if (driver === 'rtldavis') {
@@ -166,6 +168,8 @@ const views = {
       select('Altitude given in', 'altitude_unit', {meter: 'metres', foot: 'feet'}, current.altitude_unit),
       field('Time zone', 'timezone', zone, {required: true}),
       select('Units on the weather pages', 'units', {metricwx: 'Metric (°C, m/s, mm)', metric: 'Metric (°C, km/h, cm)', us: 'US (°F, mph, in)'}, current.units),
+      select('Language of the weather pages', 'language', languages, language),
+      el('p', {class: 'note', text: 'Dates and numbers follow this language. Belchertown has translated text for German, French, Italian and Catalan, partly; other languages keep English text.'}),
       driverBox,
       el('div', {class: 'row'}, el('button', {text: 'Save and start'})));
     page.replaceChildren(form);
