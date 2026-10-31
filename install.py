@@ -5,7 +5,7 @@ import os
 
 from weecfg.extension import ExtensionInstaller
 
-VERSION = '0.1.0a2'
+VERSION = '0.1.0a3'
 
 
 def loader():

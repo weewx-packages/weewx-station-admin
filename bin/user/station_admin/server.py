@@ -105,7 +105,7 @@ def get_status(handler):
 def get_station(handler):
     config = settings.load()
     return dict(values=settings.read_station(config), address=status.host_address(),
-                configured=_configured(),
+                configured=_configured(), languages=settings.installed_languages(),
                 timezone=common.run(['timedatectl', 'show', '-p', 'Timezone', '--value'],
                                     10).stdout.strip())
 

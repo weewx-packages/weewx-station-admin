@@ -6,6 +6,7 @@ import http.server
 import json
 import os
 import sqlite3
+import subprocess
 import tarfile
 import threading
 
@@ -92,17 +93,40 @@ def test_password_and_guess_limit(station):
     auth._failures.clear()
 
 
-def test_station_form_is_validated():
+def test_station_form_is_validated(monkeypatch):
+    listing = 'C\nC.utf8\nPOSIX\nde_DE.utf8\nen_GB.utf8\nxx_YY.utf8\nxx_YY.iso88591\n'
+    monkeypatch.setattr(settings.common, 'run',
+                        lambda command, timeout: subprocess.CompletedProcess(command, 0, listing))
+    assert settings.installed_languages() == {'de_DE.UTF-8': 'Deutsch (Deutschland)',
+                                              'en_GB.UTF-8': 'English (United Kingdom)',
+                                              'xx_YY.UTF-8': 'xx_YY'}
     good = dict(location='Garden', latitude='52,5', longitude='13.4', altitude='34',
                 altitude_unit='meter', timezone='Europe/Berlin', units='metricwx',
-                driver='ecowitt', port='8080')
+                driver='ecowitt', port='8080', language='de_DE.UTF-8')
     settings_, errors = settings.parse_station(good)
     assert errors == [] and settings_['latitude'] == 52.5
     _, errors = settings.parse_station(dict(good, latitude='nan', driver='x', timezone='Mars'))
     assert len(errors) == 3
+    _, errors = settings.parse_station(dict(good, language='fr_FR.UTF-8'))
+    assert errors == ['Choose the language.']
     _, errors = settings.parse_station(dict(good, driver='rtldavis', band='EU', channel='12',
                                             bucket='1'))
     assert errors == ['The ISS channel must be 1 to 8.']
+
+
+def test_language_sets_both_options_of_belchertown(station):
+    assert settings.read_station(settings.load())['language'] == settings.DEFAULT_LANGUAGE
+    steps = settings.station_steps(dict(location='Garden', latitude=52.5, longitude=13.4,
+                                        altitude=34.0, altitude_unit='meter', units='metricwx',
+                                        timezone='Europe/Berlin', driver='ecowitt', port=8080.0,
+                                        language='de_DE.UTF-8'))
+    for step in steps:
+        if callable(step):
+            step(Log())
+    config = settings.load()
+    assert config['StdReport']['Belchertown']['lang'] == 'de_DE.UTF-8'
+    assert config['StdReport']['Belchertown']['Extras']['belchertown_locale'] == 'de_DE.UTF-8'
+    assert settings.read_station(config)['language'] == 'de_DE.UTF-8'
 
 
 def test_backup_holds_a_consistent_database_and_restores(station):
