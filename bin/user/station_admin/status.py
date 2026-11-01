@@ -41,6 +41,9 @@ def reception_message(lines):
         str|None: The message of the newest known line, or None if there is none.
     """
     for line in reversed(lines):
+        # Older lines belong to the previous start, perhaps with another driver.
+        if 'Initializing weewxd' in line:
+            break
         for text, message in RECEPTION:
             if text in line:
                 return message

@@ -210,6 +210,13 @@ def test_a_station_id_left_empty_removes_the_placeholder(station):
     assert config['StdArchive']['record_generation'] == 'hardware'
 
 
+def test_reception_ignores_what_an_earlier_driver_logged():
+    lines = ['No RTL-SDR dongle found', 'INFO __main__: Initializing weewxd version 5.5.2',
+             'ERROR could not open port']
+    assert status.reception_message(lines) is None
+    assert status.reception_message(lines + ['Waiting for broadcasts from a WeatherFlow hub'])
+
+
 def test_backup_holds_a_consistent_database_and_restores(station):
     backups.create_step(Log())
     name = backups.listing()[0]['name']
