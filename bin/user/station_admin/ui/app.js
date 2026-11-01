@@ -6,6 +6,9 @@ const tabs = document.getElementById('tabs');
 const jobBox = document.getElementById('job');
 const logout = document.getElementById('logout');
 let refreshTimer = null;
+// Counts the tab changes. A refresh that was under way during a change is dropped,
+// or its late answer would replace the page of the new tab.
+let tabChanges = 0;
 
 // Build an element. Text always goes through textContent, so nothing from the
 // station or an extension can become markup.
@@ -39,6 +42,11 @@ async function api(path, body, method) {
   if (reply.status === 401) { showLogin(); throw new Error('Log in first.'); }
   if (!reply.ok) throw new Error(value.error || 'The request failed.');
   return value;
+}
+
+// Replace the page. Parts of a page can be null, which replaceChildren would print.
+function show(...children) {
+  page.replaceChildren(...children.flat().filter(child => child !== null && child !== undefined));
 }
 
 function size(bytes) {
@@ -112,7 +120,9 @@ async function follow(number, after) {
 const views = {
   async Status() {
     const draw = async () => {
+      const change = tabChanges;
       const status = await api('status');
+      if (change !== tabChanges) return;
       const tiles = [
         ['WeeWX', status.weewx],
         ['Last record', status.record ? when(status.record.time) : 'none yet'],
@@ -124,7 +134,7 @@ const views = {
         ['Address', status.address || '-'],
       ];
       const live = status.live ? Object.entries(status.live).filter(([name]) => !['dateTime', 'usUnits'].includes(name)) : [];
-      page.replaceChildren(
+      show(
         el('p', {class: 'message', text: status.message}),
         el('div', {class: 'tiles'}, tiles.map(([name, value]) => el('div', {class: 'tile'}, el('b', {text: String(value)}), el('span', {text: name})))),
         live.length ? el('h2', {text: 'Current readings'}) : null,
@@ -137,30 +147,43 @@ const views = {
   },
 
   async Station() {
-    const {values: current, address, configured, timezone, languages} = await api('station');
+    const {values: current, drivers, address, configured, timezone, languages} = await api('station');
     const zone = !configured && Intl.DateTimeFormat().resolvedOptions().timeZone || timezone;
     const browserLanguage = navigator.language.replace('-', '_') + '.UTF-8';
     const language = !configured && browserLanguage in languages ? browserLanguage : current.language;
     const driverBox = el('div');
-    const drawDriver = driver => {
-      if (driver === 'rtldavis') {
-        driverBox.replaceChildren(
-          select('Frequency band', 'band', {EU: 'EU, 868 MHz', US: 'US, 915 MHz', NZ: 'NZ, 921 MHz'}, current.band, {
-            onchange: event => { driverBox.querySelector('[name=bucket]').value = event.target.value === 'US' ? '0' : '1'; }}),
-          select('ISS channel, as shown on the console', 'channel', Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map(n => [n, n])), current.channel),
-          select('Rain bucket', 'bucket', {1: '0.2 mm per tip', 0: '0.01 inch per tip'}, current.bucket));
-      } else {
-        driverBox.replaceChildren(
-          field('Port', 'port', current.port, {inputmode: 'numeric'}),
-          el('p', {class: 'note', text: `In WS View Plus under Weather Services, Customized, set: protocol Ecowitt, server ${address || 'this address'}, path /, port ${current.port}, interval 60 seconds.`}));
+    const driverInput = item => {
+      if (item.kind === 'choice') {
+        // A US station has the 0.01 inch bucket, the others the 0.2 mm one.
+        const linked = item.name === 'band' ? {onchange: event => { driverBox.querySelector('[name=bucket]').value = event.target.value === 'US' ? '0' : '1'; }} : {};
+        return select(item.label, item.name, item.choices, item.value, linked);
       }
+      if (item.kind === 'secret') {
+        return field(item.label, item.name, '', {type: 'password', autocomplete: 'off', placeholder: item.stored ? 'Stored. Leave empty to keep it.' : ''});
+      }
+      return field(item.label, item.name, item.value, item.kind === 'port' ? {inputmode: 'numeric'} : {});
+    };
+    const drawDriver = key => {
+      const driver = drivers.find(item => item.key === key);
+      const inputs = driver.fields.map(item => [item, driverInput(item)]);
+      const showFields = () => {
+        for (const [item, input] of inputs) {
+          const shown = !item.when || driverBox.querySelector(`[name=${item.when[0]}]`).value === item.when[1];
+          input.style.display = shown ? '' : 'none';
+        }
+      };
+      const note = driver.note ? [el('p', {class: 'note', text: driver.note.replace('{address}', address || 'this address')})] : [];
+      driverBox.replaceChildren(...inputs.map(([, input]) => input), ...note);
+      driverBox.onchange = showFields;
+      showFields();
     };
     drawDriver(current.driver);
     const form = el('form', {onsubmit: event => {
       event.preventDefault();
       act('station', values(form), () => { select_tab('Status'); });
     }},
-      select('Kind of station', 'driver', {rtldavis: 'Davis, through an RTL-SDR dongle', ecowitt: 'Ecowitt console'}, current.driver, {onchange: event => drawDriver(event.target.value)}),
+      select('Kind of station', 'driver', Object.fromEntries(drivers.map(item => [item.key, item.title])), current.driver, {onchange: event => drawDriver(event.target.value)}),
+      driverBox,
       field('Station name', 'location', configured ? current.location : '', {required: true, maxlength: 80}),
       field('Latitude', 'latitude', configured ? current.latitude : '', {required: true, inputmode: 'decimal', placeholder: '52.52'}),
       field('Longitude', 'longitude', configured ? current.longitude : '', {required: true, inputmode: 'decimal', placeholder: '13.40'}),
@@ -170,14 +193,15 @@ const views = {
       select('Units on the weather pages', 'units', {metricwx: 'Metric (°C, m/s, mm)', metric: 'Metric (°C, km/h, cm)', us: 'US (°F, mph, in)'}, current.units),
       select('Language of the weather pages', 'language', languages, language),
       el('p', {class: 'note', text: 'Dates and numbers follow this language. Belchertown has translated text for German, French, Italian and Catalan, partly; other languages keep English text.'}),
-      driverBox,
       el('div', {class: 'row'}, el('button', {text: 'Save and start'})));
-    page.replaceChildren(form);
+    show(form);
   },
 
   async Sensors() {
     const draw = async () => {
+      const change = tabChanges;
       const data = await api('sensors');
+      if (change !== tabChanges) return;
       const rows = data.observations.map(item => el('tr', {},
         el('td', {text: item.name}), el('td', {text: String(Math.round(item.value * 100) / 100)}),
         el('td', {}, item.archived ? 'kept' : el('button', {class: 'quiet', text: 'Add column', onclick: () => act('database', {action: 'add', name: item.name, type: 'REAL'}, draw)}))));
@@ -185,7 +209,7 @@ const views = {
       const left = 'WeeWX field';
       const right = data.map_kind === 'sensor_map' ? 'Decoded reading' : 'Field from the console';
       const editor = el('tbody', {}, entries.map(([key, value]) => mapRow(key, value)));
-      page.replaceChildren(
+      show(
         el('h2', {text: 'What the station receives'}),
         rows.length ? el('table', {}, el('thead', {}, el('tr', {}, ['Observation', 'Value', 'History'].map(text => el('th', {text})))), el('tbody', {}, rows))
           : el('p', {class: 'note', text: 'Nothing received in the last two minutes.'}),
@@ -222,7 +246,7 @@ const views = {
             act('database', {action: 'drop', name: column.name}, redraw);
           }
         }})])));
-    page.replaceChildren(
+    show(
       el('p', {text: `Database size ${size(data.size)}. Every change makes a backup first and stops WeeWX while it runs.`}),
       el('form', {class: 'row', onsubmit: event => { event.preventDefault(); act('database', {action: 'add', name: name.value, type: kind.value}, redraw); }},
         name, kind, el('button', {text: 'Add column'})),
@@ -248,7 +272,7 @@ const views = {
     filter.addEventListener('input', draw);
     draw();
     const upload = el('input', {type: 'file', accept: '.zip,.gz,.tgz'});
-    page.replaceChildren(
+    show(
       data.error ? el('p', {class: 'error', text: data.error}) : null,
       el('h2', {text: 'Installed'}),
       el('table', {}, el('thead', {}, el('tr', {}, ['Name', 'Version', 'Source', ''].map(text => el('th', {text})))),
@@ -271,7 +295,7 @@ const views = {
   async Reports() {
     const data = await api('reports');
     const redraw = () => select_tab('Reports');
-    page.replaceChildren(
+    show(
       el('table', {}, el('thead', {}, el('tr', {}, ['Report', 'Skin', 'Target', 'On'].map(text => el('th', {text})))),
         el('tbody', {}, data.reports.map(report => el('tr', {},
           el('td', {text: report.name}), el('td', {text: report.skin}), el('td', {text: report.html_root}),
@@ -282,7 +306,7 @@ const views = {
   async Uploads() {
     const data = await api('uploads');
     const redraw = () => select_tab('Uploads');
-    page.replaceChildren(el('div', {}, Object.entries(data.services).map(([name, service]) => {
+    show(el('div', {}, Object.entries(data.services).map(([name, service]) => {
       const form = el('form', {class: 'service', onsubmit: event => {
         event.preventDefault();
         const submitted = values(form);
@@ -303,7 +327,7 @@ const views = {
     const data = await api('backups');
     const redraw = () => select_tab('Backup');
     const upload = el('input', {type: 'file', accept: '.gz'});
-    page.replaceChildren(
+    show(
       el('p', {text: 'A backup holds the database, weewx.conf with its passwords, the extensions and the skins. Keep downloads somewhere safe.'}),
       el('div', {class: 'row'}, el('button', {text: 'Create a backup', onclick: () => act('backups', {action: 'create'}, redraw)})),
       el('table', {}, el('thead', {}, el('tr', {}, ['File', 'Size', 'Created', ''].map(text => el('th', {text})))),
@@ -330,7 +354,7 @@ const views = {
       field('Current password', 'current', '', {type: 'password', required: true, autocomplete: 'current-password'}),
       field('New password', 'new', '', {type: 'password', required: true, minlength: 8, autocomplete: 'new-password'}),
       el('div', {class: 'row'}, el('button', {text: 'Change the password'})));
-    page.replaceChildren(
+    show(
       el('h2', {text: 'Station'}),
       el('div', {class: 'row'},
         el('button', {text: 'Restart WeeWX', onclick: () => act('system', {action: 'restart-weewx'})}),
@@ -344,13 +368,14 @@ const views = {
 };
 
 async function select_tab(name) {
+  tabChanges++;
   clearInterval(refreshTimer);
   refreshTimer = null;
   for (const button of tabs.children) button.classList.toggle('active', button.textContent === name);
   try {
     await views[name]();
   } catch (error) {
-    page.replaceChildren(el('p', {class: 'error', text: error.message}));
+    show(el('p', {class: 'error', text: error.message}));
   }
 }
 
@@ -373,7 +398,7 @@ function showLogin() {
       showApplication('Status');
     } catch (error) { failure(error); }
   }}, el('label', {text: 'Password'}, password), el('div', {class: 'row'}, el('button', {text: 'Log in'})));
-  page.replaceChildren(form);
+  show(form);
 }
 
 function showFirstStart() {
@@ -392,7 +417,7 @@ function showFirstStart() {
     el('label', {text: 'Password, at least 8 characters'}, first),
     el('label', {text: 'Repeat the password'}, second),
     el('div', {class: 'row'}, el('button', {text: 'Continue'})));
-  page.replaceChildren(form);
+  show(form);
 }
 
 logout.addEventListener('click', async () => {
@@ -407,7 +432,7 @@ logout.addEventListener('click', async () => {
     try {
       session = await api('session');
     } catch (error) {
-      page.replaceChildren(el('p', {class: 'note', text: 'Waiting for the administration.'}));
+      show(el('p', {class: 'note', text: 'Waiting for the administration.'}));
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }

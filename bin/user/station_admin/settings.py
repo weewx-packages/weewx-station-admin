@@ -8,13 +8,9 @@ import zoneinfo
 
 import configobj
 
-from user.station_admin import common, jobs
+from user.station_admin import common, drivers, extensions, jobs
 
 UNITS = ('metricwx', 'metric', 'us')
-DRIVERS = {
-    'rtldavis': dict(module='user.rtldavis', section='Rtldavis', title='Davis, through an RTL-SDR dongle'),
-    'ecowitt': dict(module='user.ecowittcustom', section='Ecowittcustom', title='Ecowitt console'),
-}
 DEFAULT_LANGUAGE = 'en_GB.UTF-8'
 # The station page offers whatever locales the system has. This table only gives the
 # ones the image generates a readable name, in their own language.
@@ -116,20 +112,11 @@ def parse_station(form):
         errors.append('Choose the language.')
     if settings['altitude_unit'] not in ('meter', 'foot'):
         errors.append('Choose the unit of the altitude.')
-    if settings['driver'] not in DRIVERS:
+    if settings['driver'] not in drivers.DRIVERS:
         errors.append('Choose the kind of station.')
-    elif settings['driver'] == 'rtldavis':
-        settings['band'] = form.get('band')
-        settings['channel'] = str(form.get('channel'))
-        settings['bucket'] = str(form.get('bucket'))
-        if settings['band'] not in ('EU', 'US', 'NZ'):
-            errors.append('Choose the frequency band.')
-        if settings['channel'] not in '12345678' or len(settings['channel']) != 1:
-            errors.append('The ISS channel must be 1 to 8.')
-        if settings['bucket'] not in ('0', '1'):
-            errors.append('Choose the rain bucket.')
     else:
-        settings['port'] = _number(form, 'port', 1024, 65535, errors)
+        settings['options'], problems = drivers.parse(settings['driver'], form, load())
+        errors.extend(problems)
     return settings, errors
 
 
@@ -144,9 +131,6 @@ def read_station(config):
     """
     station = config['Station']
     altitude = station.get('altitude', ['0', 'meter'])
-    rtldavis = config.get('Rtldavis', {})
-    ecowitt = config.get('Ecowittcustom', {})
-    driver = 'ecowitt' if station.get('station_type') == 'Ecowittcustom' else 'rtldavis'
     extras = config['StdReport'].get('Belchertown', {}).get('Extras', {})
     language = extras.get('belchertown_locale', 'auto')
     return dict(location=station.get('location', ''), latitude=station.get('latitude', ''),
@@ -154,10 +138,7 @@ def read_station(config):
                 altitude_unit=altitude[1],
                 units=config['StdReport']['Defaults'].get('unit_system', 'metricwx'),
                 language=DEFAULT_LANGUAGE if language == 'auto' else language,
-                driver=driver, band=rtldavis.get('transceiver_frequency', 'EU'),
-                channel=rtldavis.get('iss_channel', '1'),
-                bucket=rtldavis.get('rain_bucket_type', '1'),
-                port=ecowitt.get('port', '8080'))
+                driver=drivers.active(config))
 
 
 def station_steps(settings):
@@ -168,21 +149,20 @@ def station_steps(settings):
 
     Returns:
         list[list[str]|Callable[[jobs.Job], None]]: The steps of the job.
+
+    Raises:
+        OSError: The driver has to be installed and the catalog cannot be read.
     """
-    driver = DRIVERS[settings['driver']]
+    key = settings['driver']
+    driver = drivers.DRIVERS[key]
+    package = drivers.needs_package(key)
 
     def write_driver(job):
         # weectl has no options for driver settings. ConfigObj keeps the comments.
         config = load()
-        section = config[driver['section']]
-        if settings['driver'] == 'rtldavis':
-            section['transceiver_frequency'] = settings['band']
-            section['iss_channel'] = settings['channel']
-            section['rain_bucket_type'] = settings['bucket']
-        else:
-            section['port'] = str(int(settings['port']))
+        drivers.apply(key, config, settings['options'])
         save(config)
-        job.write('Saved the settings of the %s driver.' % settings['driver'])
+        job.write('Saved the settings of the %s driver.' % key)
 
     def write_language(job):
         # Each option does one part. `lang` selects the translation and the number
@@ -195,7 +175,12 @@ def station_steps(settings):
         save(config)
         job.write('Set the language of the weather pages to %s.' % settings['language'])
 
-    return [
+    install = extensions.package_steps(*package) if package else []
+    # write_driver runs twice. weectl needs the address first, because it asks some
+    # drivers to read their hardware, and its default stanza would then put placeholders
+    # back into the section.
+    return install + [
+        write_driver,
         ['weectl', 'station', 'reconfigure', '--config=' + common.CONFIG_PATH, '--no-prompt',
          '--no-backup', '--driver=' + driver['module'],
          '--location=' + settings['location'],
