@@ -176,7 +176,11 @@ def station_steps(settings):
         job.write('Set the language of the weather pages to %s.' % settings['language'])
 
     install = extensions.package_steps(*package) if package else []
+    # write_driver runs twice. weectl needs the address first, because it asks some
+    # drivers to read their hardware, and its default stanza would then put placeholders
+    # back into the section.
     return install + [
+        write_driver,
         ['weectl', 'station', 'reconfigure', '--config=' + common.CONFIG_PATH, '--no-prompt',
          '--no-backup', '--driver=' + driver['module'],
          '--location=' + settings['location'],

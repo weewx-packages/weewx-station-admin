@@ -9,6 +9,8 @@ import os
 
 from user.station_admin import common
 
+# Empty lines a command can read. Far more than any installer or driver asks for.
+ANSWERS = 64
 _counter = itertools.count(1)
 _jobs = {}
 _lock = threading.Lock()
@@ -62,8 +64,16 @@ class Job:
 def _run_command(job, command):
     job.write('$ ' + ' '.join(command))
     environment = dict(os.environ, PYTHONPATH=common.PYTHON_PATH)
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                               text=True, errors='replace', env=environment)
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, errors='replace',
+                               env=environment)
+    # weewx-EcowittGateway asks questions even under `weectl --no-prompt`, and there is no
+    # terminal here to answer them. An empty line takes the default of each question.
+    try:
+        process.stdin.write('\n' * ANSWERS)
+        process.stdin.close()
+    except BrokenPipeError:
+        pass
     for line in process.stdout:
         job.write(line)
     process.wait()
