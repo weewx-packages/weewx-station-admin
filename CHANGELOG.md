@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a4 - 2026-11-01
 
 The station page offers more kinds of station: Davis through a WeatherLink logger,
 WeatherLink Live and the WeatherLink cloud, Ecowitt and Froggit read over the network,
