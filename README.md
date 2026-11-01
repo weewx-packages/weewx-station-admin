@@ -26,10 +26,28 @@ requirements, and the install, update and removal commands.
 The administration has no options. It listens on port 8377 of the loopback
 interface, and nginx forwards `/admin/` to it from the local network only.
 
+The **Station** page offers these kinds of station. It installs the driver from the
+catalog when you choose one that the station does not have yet.
+
+| Kind of station | Driver |
+|---|---|
+| Davis, through an RTL-SDR dongle | [`rtldavis`](https://github.com/weewx-packages/catalog/blob/main/packages/rtldavis.md) |
+| Davis, through a WeatherLink logger | `Vantage`, part of WeeWX |
+| Davis WeatherLink Live | [`wll`](https://github.com/weewx-packages/catalog/blob/main/packages/wll.md) |
+| Davis WeatherLink Console, through the cloud | [`davis-cloud`](https://github.com/weewx-packages/catalog/blob/main/packages/davis-cloud.md) |
+| Ecowitt or Froggit console, sending to this station | [`ecowittcustom`](https://github.com/weewx-packages/catalog/blob/main/packages/ecowittcustom.md) |
+| Ecowitt or Froggit console, read over the network | [`ecowittgateway`](https://github.com/weewx-packages/catalog/blob/main/packages/ecowittgateway.md) |
+| Ambient Weather console | [`ambient-http-push`](https://github.com/weewx-packages/catalog/blob/main/packages/ambient-http-push.md) |
+| WeatherFlow Tempest | [`tempest-udp`](https://github.com/weewx-packages/catalog/blob/main/packages/tempest-udp.md) |
+| Netatmo, through the cloud | [`netatmo`](https://github.com/weewx-packages/catalog/blob/main/packages/netatmo.md) |
+| Simulated station | `Simulator`, part of WeeWX |
+
 ## Limitations
 
 - The page uses plain HTTP, so the password crosses your network unencrypted.
 - The first visitor chooses the password.
+- None of these drivers has been tested on the image with real weather hardware.
+- Choosing a driver from the catalog needs a connection to the internet.
 - Installers of extensions run on the station with the rights of the `weewx`
   account. Install only what you trust.
 

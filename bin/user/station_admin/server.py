@@ -14,7 +14,7 @@ import time
 import urllib.parse
 import uuid
 
-from user.station_admin import (VERSION, auth, backups, common, database, extensions, jobs,
+from user.station_admin import (VERSION, auth, backups, common, database, drivers, extensions, jobs,
                                 services, settings, status)
 
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
@@ -104,7 +104,8 @@ def get_status(handler):
 
 def get_station(handler):
     config = settings.load()
-    return dict(values=settings.read_station(config), address=status.host_address(),
+    return dict(values=settings.read_station(config), drivers=drivers.describe(config),
+                address=status.host_address(),
                 configured=_configured(), languages=settings.installed_languages(),
                 timezone=common.run(['timedatectl', 'show', '-p', 'Timezone', '--value'],
                                     10).stdout.strip())
@@ -114,7 +115,11 @@ def post_station(handler, body):
     parsed, errors = settings.parse_station(body)
     if errors:
         raise Reply(400, ' '.join(errors))
-    return _start('Save the station settings', settings.station_steps(parsed))
+    try:
+        steps = settings.station_steps(parsed)
+    except OSError as error:
+        raise Reply(502, 'The catalog cannot be read: %s' % error)
+    return _start('Save the station settings', steps)
 
 
 def get_sensors(handler):

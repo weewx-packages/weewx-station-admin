@@ -23,6 +23,11 @@ RECEPTION = (
     ('Found a Davis transmitter', 'Station found. Waiting for it to stay in sync.'),
     ('Receiving transmitter', 'Receiving your station.'),
     ('listen on', 'Waiting for the first upload from your console.'),
+    ('Waiting for uploads from an Ambient Weather console',
+     'Waiting for the first upload from your console.'),
+    ('Waiting for broadcasts from a WeatherFlow hub', 'Waiting for the first broadcast of the hub.'),
+    ('No broadcast from a WeatherFlow hub',
+     'Nothing received. The hub must be on the same network as this station.'),
 )
 
 
@@ -131,10 +136,10 @@ def read():
         message = 'WeeWX is not running. See the log.'
     else:
         message = reception_message(log)
-        # The Ecowitt driver logs nothing per upload, so readings are the proof.
-        if live() and (message is None or message.startswith('Waiting for the first upload')):
-            message = 'Receiving your console.'
-        message = message or 'WeeWX is starting.'
+        # Most drivers log nothing per reading, so readings are the proof.
+        if live() and (message is None or message.startswith('Waiting for the first')):
+            message = 'Receiving your station.'
+        message = message or 'Waiting for the first readings from your station.'
     disk = shutil.disk_usage(os.path.dirname(common.DATABASE_PATH))
     try:
         with open('/etc/station-release') as stream:

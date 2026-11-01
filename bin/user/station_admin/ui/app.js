@@ -137,30 +137,42 @@ const views = {
   },
 
   async Station() {
-    const {values: current, address, configured, timezone, languages} = await api('station');
+    const {values: current, drivers, address, configured, timezone, languages} = await api('station');
     const zone = !configured && Intl.DateTimeFormat().resolvedOptions().timeZone || timezone;
     const browserLanguage = navigator.language.replace('-', '_') + '.UTF-8';
     const language = !configured && browserLanguage in languages ? browserLanguage : current.language;
     const driverBox = el('div');
-    const drawDriver = driver => {
-      if (driver === 'rtldavis') {
-        driverBox.replaceChildren(
-          select('Frequency band', 'band', {EU: 'EU, 868 MHz', US: 'US, 915 MHz', NZ: 'NZ, 921 MHz'}, current.band, {
-            onchange: event => { driverBox.querySelector('[name=bucket]').value = event.target.value === 'US' ? '0' : '1'; }}),
-          select('ISS channel, as shown on the console', 'channel', Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map(n => [n, n])), current.channel),
-          select('Rain bucket', 'bucket', {1: '0.2 mm per tip', 0: '0.01 inch per tip'}, current.bucket));
-      } else {
-        driverBox.replaceChildren(
-          field('Port', 'port', current.port, {inputmode: 'numeric'}),
-          el('p', {class: 'note', text: `In WS View Plus under Weather Services, Customized, set: protocol Ecowitt, server ${address || 'this address'}, path /, port ${current.port}, interval 60 seconds.`}));
+    const driverInput = item => {
+      if (item.kind === 'choice') {
+        // A US station has the 0.01 inch bucket, the others the 0.2 mm one.
+        const linked = item.name === 'band' ? {onchange: event => { driverBox.querySelector('[name=bucket]').value = event.target.value === 'US' ? '0' : '1'; }} : {};
+        return select(item.label, item.name, item.choices, item.value, linked);
       }
+      if (item.kind === 'secret') {
+        return field(item.label, item.name, '', {type: 'password', autocomplete: 'off', placeholder: item.stored ? 'Stored. Leave empty to keep it.' : ''});
+      }
+      return field(item.label, item.name, item.value, item.kind === 'port' ? {inputmode: 'numeric'} : {});
+    };
+    const drawDriver = key => {
+      const driver = drivers.find(item => item.key === key);
+      const inputs = driver.fields.map(item => [item, driverInput(item)]);
+      const showFields = () => {
+        for (const [item, input] of inputs) {
+          const shown = !item.when || driverBox.querySelector(`[name=${item.when[0]}]`).value === item.when[1];
+          input.style.display = shown ? '' : 'none';
+        }
+      };
+      const note = driver.note ? [el('p', {class: 'note', text: driver.note.replace('{address}', address || 'this address')})] : [];
+      driverBox.replaceChildren(...inputs.map(([, input]) => input), ...note);
+      driverBox.onchange = showFields;
+      showFields();
     };
     drawDriver(current.driver);
     const form = el('form', {onsubmit: event => {
       event.preventDefault();
       act('station', values(form), () => { select_tab('Status'); });
     }},
-      select('Kind of station', 'driver', {rtldavis: 'Davis, through an RTL-SDR dongle', ecowitt: 'Ecowitt console'}, current.driver, {onchange: event => drawDriver(event.target.value)}),
+      select('Kind of station', 'driver', Object.fromEntries(drivers.map(item => [item.key, item.title])), current.driver, {onchange: event => drawDriver(event.target.value)}),
       field('Station name', 'location', configured ? current.location : '', {required: true, maxlength: 80}),
       field('Latitude', 'latitude', configured ? current.latitude : '', {required: true, inputmode: 'decimal', placeholder: '52.52'}),
       field('Longitude', 'longitude', configured ? current.longitude : '', {required: true, inputmode: 'decimal', placeholder: '13.40'}),

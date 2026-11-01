@@ -12,7 +12,8 @@ import threading
 
 import pytest
 
-from user.station_admin import auth, backups, common, database, jobs, server, services, settings, status
+from user.station_admin import (auth, backups, common, database, drivers, extensions, jobs, server,
+                                 services, settings, status)
 
 CONFIG = """
 [Station]
@@ -93,7 +94,7 @@ def test_password_and_guess_limit(station):
     auth._failures.clear()
 
 
-def test_station_form_is_validated(monkeypatch):
+def test_station_form_is_validated(station, monkeypatch):
     listing = 'C\nC.utf8\nPOSIX\nde_DE.utf8\nen_GB.utf8\nxx_YY.utf8\nxx_YY.iso88591\n'
     monkeypatch.setattr(settings.common, 'run',
                         lambda command, timeout: subprocess.CompletedProcess(command, 0, listing))
@@ -111,15 +112,17 @@ def test_station_form_is_validated(monkeypatch):
     assert errors == ['Choose the language.']
     _, errors = settings.parse_station(dict(good, driver='rtldavis', band='EU', channel='12',
                                             bucket='1'))
-    assert errors == ['The ISS channel must be 1 to 8.']
+    assert errors == ['Choose: ISS channel, as shown on the console.']
+    _, errors = settings.parse_station(dict(good, port='80'))
+    assert errors == ['Port must be between 1024 and 65535.']
 
 
 def test_language_sets_both_options_of_belchertown(station):
     assert settings.read_station(settings.load())['language'] == settings.DEFAULT_LANGUAGE
     steps = settings.station_steps(dict(location='Garden', latitude=52.5, longitude=13.4,
                                         altitude=34.0, altitude_unit='meter', units='metricwx',
-                                        timezone='Europe/Berlin', driver='ecowitt', port=8080.0,
-                                        language='de_DE.UTF-8'))
+                                        timezone='Europe/Berlin', driver='ecowitt',
+                                        options=dict(port='8081'), language='de_DE.UTF-8'))
     for step in steps:
         if callable(step):
             step(Log())
@@ -127,6 +130,84 @@ def test_language_sets_both_options_of_belchertown(station):
     assert config['StdReport']['Belchertown']['lang'] == 'de_DE.UTF-8'
     assert config['StdReport']['Belchertown']['Extras']['belchertown_locale'] == 'de_DE.UTF-8'
     assert settings.read_station(config)['language'] == 'de_DE.UTF-8'
+    assert config['Ecowittcustom']['port'] == '8081'
+
+
+def _steps_of(driver, monkeypatch, **options):
+    monkeypatch.setattr(extensions, '_debian_packages', lambda package_id: [['apt', package_id]])
+    return settings.station_steps(dict(location='Garden', latitude=52.5, longitude=13.4,
+                                       altitude=34.0, altitude_unit='meter', units='metricwx',
+                                       timezone='Europe/Berlin', driver=driver, options=options,
+                                       language='de_DE.UTF-8'))
+
+
+def test_a_driver_comes_from_the_catalog_only_while_it_is_missing(station, monkeypatch):
+    commands = [step for step in _steps_of('tempest', monkeypatch) if isinstance(step, list)]
+    assert commands[0] == ['apt', 'tempest-udp']
+    assert commands[1][:7] == ['python3', '-m', 'user.packages', 'install', 'tempest-udp',
+                               '--repo', 'packages']
+    assert '--pre' in commands[1]
+    assert commands[2][:3] == ['weectl', 'station', 'reconfigure']
+    assert '--driver=user.tempest_udp' in commands[2]
+    (station / 'etc/bin/user/tempest_udp.py').write_text('# installed\n')
+    commands = [step for step in _steps_of('tempest', monkeypatch) if isinstance(step, list)]
+    assert commands[0][:3] == ['weectl', 'station', 'reconfigure']
+    # A package below its own directory, as davis-cloud is.
+    assert drivers.needs_package('davis-cloud') == ('davis-cloud', True)
+    (station / 'etc/bin/user/daviscloud').mkdir()
+    (station / 'etc/bin/user/daviscloud/driver.py').write_text('# installed\n')
+    assert drivers.needs_package('davis-cloud') is None
+    assert drivers.needs_package('rtldavis') is None
+
+
+def test_only_the_fields_of_the_chosen_connection_count(station):
+    config = settings.load()
+    values, errors = drivers.parse('vantage', dict(connection='ethernet', device=''), config)
+    assert errors == ['Enter: Address of the logger.']
+    values, errors = drivers.parse('vantage', dict(connection='ethernet', host='192.0.2.5'), config)
+    assert errors == [] and 'device' not in values
+    drivers.apply('vantage', config, values)
+    assert config['Vantage']['type'] == 'ethernet' and config['Vantage']['host'] == '192.0.2.5'
+
+
+def test_secrets_stay_on_the_server_and_are_kept_when_left_empty(station):
+    config = settings.load()
+    form = dict(client_id='id', client_secret='client-secret', refresh_token='refresh-token')
+    assert drivers.parse('netatmo', dict(form, refresh_token=''), config)[1] == [
+        'Enter: Refresh token.']
+    config['netatmo'] = dict(username='old', password='old', client_secret='INSERT_CLIENT_SECRET_HERE')
+    values, errors = drivers.parse('netatmo', form, config)
+    assert errors == []
+    drivers.apply('netatmo', config, values)
+    section = config['netatmo']
+    assert section['client_secret'] == 'client-secret' and 'password' not in section
+    with open(section['tokens_persistence_file']) as stream:
+        assert json.load(stream) == dict(refresh_token='refresh-token')
+    assert os.stat(section['tokens_persistence_file']).st_mode & 0o777 == 0o600
+
+    page = json.dumps(drivers.describe(config))
+    assert 'client-secret' not in page and 'refresh-token' not in page
+    values, errors = drivers.parse('netatmo', dict(client_id='id'), config)
+    assert errors == []
+    drivers.apply('netatmo', config, values)
+    assert config['netatmo']['client_secret'] == 'client-secret'
+    with open(section['tokens_persistence_file']) as stream:
+        assert json.load(stream) == dict(refresh_token='refresh-token')
+
+
+def test_a_station_id_left_empty_removes_the_placeholder(station):
+    config = settings.load()
+    config['DavisCloud'] = dict(api_key='REPLACE_ME', api_secret='REPLACE_ME', station_id='REPLACE_ME')
+    entry = [kind for kind in drivers.describe(config) if kind['key'] == 'davis-cloud'][0]
+    assert [field['value'] for field in entry['fields']] == ['', '', '']
+    values, errors = drivers.parse('davis-cloud', dict(api_key='k', api_secret='s'), config)
+    assert errors == []
+    drivers.apply('davis-cloud', config, values)
+    assert 'station_id' not in config['DavisCloud']
+    assert config['DavisCloud']['driver'] == 'user.daviscloud.driver'
+    assert config['StdArchive']['record_generation'] == 'software'
+    drivers.apply('wll', config, dict(host='192.0.2.5'))
+    assert config['StdArchive']['record_generation'] == 'hardware'
 
 
 def test_backup_holds_a_consistent_database_and_restores(station):

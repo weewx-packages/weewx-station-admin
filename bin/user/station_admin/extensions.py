@@ -77,8 +77,29 @@ def _debian_packages(package_id):
     return []
 
 
+def package_steps(package_id, pre=False):
+    """Return the steps that install a catalog package, without restarting WeeWX.
+
+    Args:
+        package_id (str): The package.
+        pre (bool): True to allow a prerelease. Default is False.
+
+    Returns:
+        list[list[str]]: The steps of the job.
+
+    Raises:
+        ValueError: The name is not valid.
+        OSError: The package needs the catalog, and it cannot be read.
+    """
+    if not PACKAGE_NAME.match(package_id):
+        raise ValueError('Not a package name.')
+    command = ['install', package_id, '--repo', 'packages', '--yes']
+    return _debian_packages(package_id) + [
+        common.package_command(*command + ['--pre'] if pre else command)]
+
+
 def install_steps(package_id):
-    """Return the steps that install a catalog package.
+    """Return the steps that install a catalog package and restart WeeWX.
 
     Args:
         package_id (str): The package.
@@ -89,11 +110,7 @@ def install_steps(package_id):
     Raises:
         ValueError: The name is not valid.
     """
-    if not PACKAGE_NAME.match(package_id):
-        raise ValueError('Not a package name.')
-    return _debian_packages(package_id) + [
-        common.package_command('install', package_id, '--repo', 'packages', '--yes'),
-        common.privileged('weewx-restart')]
+    return package_steps(package_id) + [common.privileged('weewx-restart')]
 
 
 def update_steps(package_id=None):

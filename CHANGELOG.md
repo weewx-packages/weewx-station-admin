@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+The station page offers more kinds of station: Davis through a WeatherLink logger,
+WeatherLink Live and the WeatherLink cloud, Ecowitt and Froggit read over the network,
+Ambient Weather, WeatherFlow Tempest, Netatmo and a simulated station. A driver from
+the catalog is installed when it is chosen, so this step needs the internet.
+
 ## 0.1.0a3 - 2026-10-31
 
 Choose the language of the weather pages on the station page. It offers the locales the
