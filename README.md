@@ -26,6 +26,12 @@ requirements, and the install, update and removal commands.
 The administration has no options. It listens on port 8377 of the loopback
 interface, and nginx forwards `/admin/` to it from the local network only.
 
+**Settings** edits weewx.conf and the options of each report as forms. A value for a
+skin goes into the report's section of weewx.conf, where it overrides the skin's
+`skin.conf` and survives updates of the skin. **Use the default** removes it again.
+Secrets such as passwords are never shown, only replaced. New sections and options
+need the editor on the **System** page.
+
 Under **Extensions**, a link installs an extension with `weectl extension install`:
 a GitHub repository (its newest release, or its main branch without one), one of its
 releases or branches, or a `.zip` or `.tar.gz` file. A link to a package of a catalog

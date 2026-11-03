@@ -289,5 +289,18 @@
  "The download is larger than {size} MB.": "Der Download ist größer als {size} MB.",
  "Install from {link}": "Von {link} installieren",
  "Change the catalogs": "Kataloge ändern",
- "Enter a link.": "Bitte einen Link angeben."
+ "Enter a link.": "Bitte einen Link angeben.",
+ "Settings": "Einstellungen",
+ "Report {name}, skin {skin}": "Bericht {name}, Skin {skin}",
+ "Skin default: {value}": "Standard des Skins: {value}",
+ "Use the default": "Standard verwenden",
+ "Search the options": "Optionen durchsuchen",
+ "What to set": "Was einstellen",
+ "These settings are stored in weewx.conf, in the section of the report. They override the skin and stay when the skin is updated.": "Diese Einstellungen stehen in der weewx.conf, im Abschnitt des Berichts. Sie überschreiben den Skin und bleiben bei einem Update des Skins erhalten.",
+ "Options of weewx.conf. Sections and new options are added on the System page.": "Optionen der weewx.conf. Abschnitte und neue Optionen legen Sie auf der Seite System an.",
+ "A value has one line.": "Ein Wert hat nur eine Zeile.",
+ "{text} is no valid value.": "{text} ist kein gültiger Wert.",
+ "The skin of {report} has no skin.conf.": "Der Skin von {report} hat keine skin.conf.",
+ "Unknown option.": "Unbekannte Option.",
+ "Apply the settings": "Einstellungen übernehmen"
 }

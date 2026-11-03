@@ -17,8 +17,8 @@ import time
 import configobj
 import pytest
 
-from user.station_admin import (auth, backups, common, database, drivers, extensions, i18n, jobs,
-                                 links, live, server, services, settings, status)
+from user.station_admin import (auth, backups, common, database, drivers, extensions, forms, i18n,
+                                 jobs, links, live, server, services, settings, status)
 
 CONFIG = """
 [Station]
@@ -414,6 +414,39 @@ def test_the_catalogs_come_from_the_configuration(station):
         ['repo', 'add', 'more', 'https://b']
     with pytest.raises(ValueError):
         extensions.repository_steps('remove', 'packages')
+
+
+SKIN = """
+[Extras]
+    # The title of every page
+    site_title = "My Weather Website"
+    station_observations = barometer, dewpoint
+    mqtt_websockets_password = ""
+"""
+
+
+def test_a_skin_setting_overrides_skin_conf_from_weewx_conf(station):
+    (station / 'etc/skins/Belchertown').mkdir()
+    (station / 'etc/skins/Belchertown/skin.conf').write_text(SKIN)
+    config = settings.load()
+    config['StdReport']['Belchertown']['Extras'] = {'mqtt_websockets_password': 'secret'}
+    extras = forms.describe(config, 'Belchertown')['sections'][0]['options']
+    title, observations, password = extras
+    assert (title['value'], title['default'], title['comment']) == \
+        (None, 'My Weather Website', 'The title of every page')
+    assert password['value'] == '' and password['stored']
+    forms.apply(config, 'Belchertown', [
+        dict(path=['Extras'], name='site_title', value='Garden, Berlin'),
+        dict(path=['Extras'], name='station_observations', value='barometer, rain'),
+        dict(path=['Extras'], name='mqtt_websockets_password', value='')])
+    stored = config['StdReport']['Belchertown']['Extras']
+    assert stored['site_title'] == 'Garden, Berlin'
+    assert stored['station_observations'] == ['barometer', 'rain']
+    assert stored['mqtt_websockets_password'] == 'secret'
+    forms.apply(config, 'Belchertown', [dict(path=['Extras'], name='site_title', reset=True)])
+    assert 'site_title' not in stored
+    with pytest.raises(ValueError):
+        forms.apply(config, '', [dict(path=['ExtensionRepositories'], name='url', value='x')])
 
 
 def test_readings_follow_the_units_of_the_weather_pages():

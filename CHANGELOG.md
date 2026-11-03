@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+A Settings page edits weewx.conf and the settings of every report as forms, with the
+comments of the files as help and a search. A setting of a skin, such as an option of
+Belchertown, is stored in the section of its report in weewx.conf. It overrides the
+skin.conf, survives updates of the skin, and can be set back to the skin's default.
+
 Install an extension from a link under Extensions. A GitHub repository installs its
 newest release, or its main branch if it has none. A link to a release, a branch or a
 .zip or .tar.gz file installs exactly that. WeeWX's own installer does the work. A link

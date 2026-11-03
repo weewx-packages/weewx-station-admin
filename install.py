@@ -24,9 +24,9 @@ class StationAdminInstaller(ExtensionInstaller):
             report_services='user.station_admin.live.StationLive',
             files=[(package, [os.path.join(package, name) for name in (
                        '__init__.py', '__main__.py', 'auth.py', 'backups.py', 'common.py',
-                       'database.py', 'drivers.py', 'extensions.py', 'i18n.py', 'jobs.py',
-                       'links.py', 'live.py', 'server.py', 'services.py', 'settings.py',
-                       'status.py')]),
+                       'database.py', 'drivers.py', 'extensions.py', 'forms.py', 'i18n.py',
+                       'jobs.py', 'links.py', 'live.py', 'server.py', 'services.py',
+                       'settings.py', 'status.py')]),
                    (package + '/ui', [os.path.join(package, 'ui', name) for name in (
                        'app.js', 'index.html', 'style.css')]),
                    (package + '/ui/i18n', [os.path.join(package, 'ui', 'i18n', 'de.json')])])

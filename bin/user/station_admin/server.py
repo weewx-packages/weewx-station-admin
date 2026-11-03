@@ -14,8 +14,8 @@ import time
 import urllib.parse
 import uuid
 
-from user.station_admin import (VERSION, auth, backups, common, database, drivers, extensions, i18n,
-                                jobs, links, services, settings, status)
+from user.station_admin import (VERSION, auth, backups, common, database, drivers, extensions,
+                                forms, i18n, jobs, links, services, settings, status)
 from user.station_admin.i18n import _
 
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
@@ -124,6 +124,25 @@ def post_station(handler, body):
     except OSError as error:
         raise Reply(502, _('The catalog cannot be read: {error}', error=error))
     return _start(_('Save the station settings'), steps)
+
+
+def get_settings(handler):
+    report = urllib.parse.parse_qs(urllib.parse.urlsplit(handler.path).query).get('form', [''])[0]
+    config = settings.load()
+    try:
+        return dict(forms=forms.forms(config), tree=forms.describe(config, report))
+    except ValueError as error:
+        raise Reply(400, str(error))
+
+
+def post_settings(handler, body):
+    config = settings.load()
+    try:
+        forms.apply(config, str(body.get('form', '')), body.get('changes', []))
+    except ValueError as error:
+        raise Reply(400, str(error))
+    forms.save(config)
+    return _start(_('Apply the settings'), [common.privileged('weewx-restart')])
 
 
 def get_sensors(handler):
@@ -287,14 +306,16 @@ def get_jobs(handler):
 
 
 GET = {'session': (get_session, False), 'status': (get_status, True),
-       'station': (get_station, True), 'sensors': (get_sensors, True),
+       'station': (get_station, True), 'settings': (get_settings, True),
+       'sensors': (get_sensors, True),
        'database': (get_database, True), 'extensions': (get_extensions, True),
        'reports': (get_reports, True), 'uploads': (get_uploads, True),
        'backups': (get_backups, True), 'config': (get_config, True),
        'jobs': (get_jobs, True)}
 POST = {'setup-password': (post_setup_password, False), 'login': (post_login, False),
         'logout': (post_logout, True), 'password': (post_password, True),
-        'station': (post_station, True), 'sensors': (post_sensors, True),
+        'station': (post_station, True), 'settings': (post_settings, True),
+        'sensors': (post_sensors, True),
         'database': (post_database, True), 'extensions': (post_extensions, True),
         'reports': (post_reports, True), 'uploads': (post_uploads, True),
         'backups': (post_backups, True), 'config': (post_config, True),
