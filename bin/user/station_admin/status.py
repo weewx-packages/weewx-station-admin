@@ -8,7 +8,9 @@ import socket
 import sqlite3
 import time
 
-from user.station_admin import VERSION, common
+import configobj
+
+from user.station_admin import VERSION, common, i18n
 from user.station_admin.i18n import N_, _
 
 # Log messages of the drivers, as text to find and what to tell the user. The
@@ -115,6 +117,33 @@ def _temperature():
         return None
 
 
+_labels = {}
+
+
+def observation_labels(language):
+    """Return the names of the observations in a language.
+
+    The Seasons skin of WeeWX has them translated, and every station has that skin.
+
+    Args:
+        language (str): A key of i18n.LANGUAGES.
+
+    Returns:
+        dict: The name of each observation by its WeeWX name (e.g., 'outTemp'). Empty if
+            the skin has no file for the language.
+    """
+    if language not in _labels:
+        path = os.path.join(common.SKIN_ROOT, 'Seasons', 'lang', language + '.conf')
+        try:
+            labels = configobj.ConfigObj(path, encoding='utf-8', interpolation=False,
+                                         file_error=True)['Labels']['Generic']
+            _labels[language] = {name: str(text) for name, text in labels.items()
+                                 if isinstance(text, str)}
+        except (OSError, KeyError, configobj.ConfigObjError):
+            _labels[language] = {}
+    return _labels[language]
+
+
 def _read(path):
     try:
         with open(path, encoding='utf-8', errors='replace') as stream:
@@ -192,6 +221,7 @@ def read():
                         10).stdout.strip() == 'yes'
     log = common.run(['journalctl', '-u', 'weewx', '-n', '300', '-o', 'cat', '--no-pager'],
                      20).stdout.splitlines()
+    readings = live()
     if not enabled:
         message = N_('Choose your station on the Station page.')
     elif not synced:
@@ -201,8 +231,11 @@ def read():
     else:
         message = reception_message(log)
         # Most drivers log nothing per reading, so readings are the proof.
-        if live() and (message is None or message.startswith('Waiting for the first')):
+        if readings and (message is None or message.startswith('Waiting for the first')):
             message = N_('Receiving your station.')
         message = message or N_('Waiting for the first readings from your station.')
+    names = observation_labels(i18n.current())
+    labels = {name: names[name] for name in readings or {} if name in names}
     return dict(message=_(message), weewx=state, configured=enabled, record=last_record(),
-                live=live(), log='\n'.join(log[-40:]), now=time.time(), raspberry=raspberry(synced))
+                live=readings, labels=labels, log='\n'.join(log[-40:]), now=time.time(),
+                raspberry=raspberry(synced))

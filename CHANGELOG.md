@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+A new look: cards, a calmer header with tabs that scroll on a phone, a coloured state
+on the status message, and a dark mode that follows the system. Current readings
+carry the names the weather pages use, in the language of the page. The Raspberry Pi
+section shows what needs attention as tiles and the rest as a list. Before the login
+the empty tab bar no longer shows.
+
 ## 0.1.0a10 - 2026-11-03
 
 The station page asks for the title of the weather pages. It follows the station name
