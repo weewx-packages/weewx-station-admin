@@ -129,7 +129,7 @@ const views = {
         ['Records', status.record ? status.record.rows.toLocaleString() : '0'],
         ['Free disk', size(status.disk.free)],
         ['Free memory', size(status.memory.available)],
-        ['Temperature', status.temperature === null ? '-' : status.temperature.toFixed(1) + ' °C'],
+        ['Processor temperature', status.temperature === null ? '-' : status.temperature.toFixed(1) + ' °C'],
         ['Time', status.time_synced ? 'synchronized' : 'waiting'],
         ['Address', status.address || '-'],
       ];
@@ -138,7 +138,7 @@ const views = {
         el('p', {class: 'message', text: status.message}),
         el('div', {class: 'tiles'}, tiles.map(([name, value]) => el('div', {class: 'tile'}, el('b', {text: String(value)}), el('span', {text: name})))),
         live.length ? el('h2', {text: 'Current readings'}) : null,
-        live.length ? el('div', {class: 'tiles'}, live.map(([name, value]) => el('div', {class: 'tile'}, el('b', {text: String(Math.round(value * 100) / 100)}), el('span', {text: name})))) : null,
+        live.length ? el('div', {class: 'tiles'}, live.map(([name, text]) => el('div', {class: 'tile'}, el('b', {text}), el('span', {text: name})))) : null,
         el('h2', {text: 'Log'}), el('pre', {text: status.log}),
         el('p', {class: 'note', text: status.release || ''}));
     };

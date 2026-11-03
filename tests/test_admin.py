@@ -11,10 +11,11 @@ import tarfile
 import threading
 import time
 
+import configobj
 import pytest
 
-from user.station_admin import (auth, backups, common, database, drivers, extensions, jobs, server,
-                                 services, settings, status)
+from user.station_admin import (auth, backups, common, database, drivers, extensions, jobs, live,
+                                 server, services, settings, status)
 
 CONFIG = """
 [Station]
@@ -345,6 +346,13 @@ def test_a_session_outlasts_the_first_time_sync(monkeypatch):
     wall_clock = time.time() + 28 * 86400
     monkeypatch.setattr(time, 'time', lambda: wall_clock)
     assert auth.session_valid(token)
+
+
+def test_readings_follow_the_units_of_the_weather_pages():
+    config = configobj.ConfigObj({'StdReport': {'Defaults': {'unit_system': 'metricwx'}}})
+    converter, formatter = live.report_units(config)
+    packet = dict(usUnits=1, outTemp=41.7, wh65_batt=0.0)
+    assert live.readings(packet, converter, formatter) == dict(outTemp='5.4°C', wh65_batt='0')
 
 
 def test_posts_from_other_pages_are_refused(api):
