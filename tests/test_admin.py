@@ -108,13 +108,13 @@ def test_station_form_is_validated(station, monkeypatch):
                                               'xx_YY.UTF-8': 'xx_YY'}
     good = dict(location='Garden', latitude='52,5', longitude='13.4', altitude='34',
                 altitude_unit='meter', timezone='Europe/Berlin', units='metricwx',
-                driver='ecowitt', port='8080', language='de_DE.UTF-8')
+                driver='ecowitt', port='8080', language='de_DE.UTF-8', title='Garden weather')
     settings_, errors = settings.parse_station(good)
     assert errors == [] and settings_['latitude'] == 52.5
     _, errors = settings.parse_station(dict(good, latitude='nan', driver='x', timezone='Mars'))
     assert len(errors) == 3
-    _, errors = settings.parse_station(dict(good, language='fr_FR.UTF-8'))
-    assert errors == ['Choose the language.']
+    _, errors = settings.parse_station(dict(good, language='fr_FR.UTF-8', title=' '))
+    assert errors == ['The weather pages need a title.', 'Choose the language.']
     _, errors = settings.parse_station(dict(good, driver='rtldavis', band='EU', channel='12',
                                             bucket='1'))
     assert errors == ['Choose: ISS channel, as shown on the console.']
@@ -127,7 +127,8 @@ def test_language_sets_both_options_of_belchertown(station):
     steps = settings.station_steps(dict(location='Garden', latitude=52.5, longitude=13.4,
                                         altitude=34.0, altitude_unit='meter', units='metricwx',
                                         timezone='Europe/Berlin', driver='ecowitt',
-                                        options=dict(port='8081'), language='de_DE.UTF-8'))
+                                        options=dict(port='8081'), language='de_DE.UTF-8',
+                                        title='Wetter, Garten'))
     for step in steps:
         if callable(step):
             step(Log())
@@ -135,6 +136,8 @@ def test_language_sets_both_options_of_belchertown(station):
     assert config['StdReport']['Belchertown']['lang'] == 'de_DE.UTF-8'
     assert config['StdReport']['Belchertown']['Extras']['belchertown_locale'] == 'de_DE.UTF-8'
     assert settings.read_station(config)['language'] == 'de_DE.UTF-8'
+    assert config['StdReport']['Belchertown']['Extras']['site_title'] == 'Wetter, Garten'
+    assert settings.read_station(config)['title'] == 'Wetter, Garten'
     assert config['Ecowittcustom']['port'] == '8081'
 
 

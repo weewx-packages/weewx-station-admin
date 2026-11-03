@@ -98,6 +98,7 @@ def parse_station(form):
     """
     errors = []
     settings = dict(location=str(form.get('location', '')).strip(),
+                    title=str(form.get('title', '')).strip(),
                     timezone=str(form.get('timezone', '')).strip(),
                     units=form.get('units'), language=form.get('language'),
                     driver=form.get('driver'), altitude_unit=form.get('altitude_unit'))
@@ -106,6 +107,8 @@ def parse_station(form):
     settings['altitude'] = _number(form, 'altitude', -500, 30000, errors)
     if not settings['location'] or not settings['location'].isprintable():
         errors.append(_('The station needs a name.'))
+    if not settings['title'] or not settings['title'].isprintable():
+        errors.append(_('The weather pages need a title.'))
     if settings['timezone'] not in zoneinfo.available_timezones():
         errors.append(_('Time zone must be a name such as Europe/Berlin.'))
     if settings['units'] not in UNITS:
@@ -140,7 +143,7 @@ def read_station(config):
                 altitude_unit=altitude[1],
                 units=config['StdReport']['Defaults'].get('unit_system', 'metricwx'),
                 language=DEFAULT_LANGUAGE if language == 'auto' else language,
-                driver=drivers.active(config))
+                title=extras.get('site_title', ''), driver=drivers.active(config))
 
 
 def station_steps(settings):
@@ -166,17 +169,21 @@ def station_steps(settings):
         save(config)
         job.write(_('Saved the settings of the {driver} driver.', driver=key))
 
-    def write_language(job):
+    def write_pages(job):
         # Each option does one part. `lang` selects the translation and the number
         # format, `belchertown_locale` the language of dates in the browser. With its
         # default, auto, Belchertown reads the locale of the service and ignores `lang`.
         config = load()
         report = config['StdReport']['Belchertown']
+        extras = report.setdefault('Extras', {})
         report['lang'] = settings['language']
-        report.setdefault('Extras', {})['belchertown_locale'] = settings['language']
+        extras['belchertown_locale'] = settings['language']
+        # The manifest names the page when a phone adds it to its home screen.
+        extras['site_title'] = extras['manifest_name'] = settings['title']
         save(config)
         job.write(_('Set the language of the weather pages to {language}.',
                     language=settings['language']))
+        job.write(_('Set the title of the weather pages to {title}.', title=settings['title']))
 
     install = extensions.package_steps(*package) if package else []
     # write_driver runs twice. weectl needs the address first, because it asks some
@@ -192,7 +199,7 @@ def station_steps(settings):
          '--altitude=%s,%s' % (settings['altitude'], settings['altitude_unit']),
          '--units=' + settings['units']],
         write_driver,
-        write_language,
+        write_pages,
         common.privileged('set-timezone', settings['timezone']),
         common.privileged('weewx-enable'),
         common.privileged('weewx-restart'),

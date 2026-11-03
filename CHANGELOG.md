@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+The station page asks for the title of the weather pages. It follows the station name
+until you type your own, and sets `site_title` and `manifest_name` of Belchertown.
+
 ## 0.1.0a9 - 2026-11-03
 
 A Settings page edits weewx.conf and the settings of every report as forms, with the

@@ -302,5 +302,8 @@
  "{text} is no valid value.": "{text} ist kein gültiger Wert.",
  "The skin of {report} has no skin.conf.": "Der Skin von {report} hat keine skin.conf.",
  "Unknown option.": "Unbekannte Option.",
- "Apply the settings": "Einstellungen übernehmen"
+ "Apply the settings": "Einstellungen übernehmen",
+ "The weather pages need a title.": "Die Wetterseiten brauchen einen Titel.",
+ "Set the title of the weather pages to {title}.": "Titel der Wetterseiten auf {title} gesetzt.",
+ "Title of the weather pages": "Titel der Wetterseiten"
 }
