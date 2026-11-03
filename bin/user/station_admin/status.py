@@ -90,7 +90,8 @@ def live():
     """Return the latest packet from the WeeWX service, if it is recent.
 
     Returns:
-        dict|None: Observations by name, or None if none arrived for two minutes.
+        dict|None: The text of each reading by name, in the units of the weather pages,
+            or None if none arrived for two minutes.
     """
     try:
         with open(common.LIVE_PATH) as stream:
@@ -99,7 +100,7 @@ def live():
         return None
     if time.time() - packet.get('written', 0) > 120:
         return None
-    return packet.get('observations')
+    return packet.get('readings')
 
 
 def _temperature():

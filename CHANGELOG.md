@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+The current readings on the status page are in the units of the weather pages, with
+their unit. Before, they showed what the driver sent, such as °F for an Ecowitt console.
+The temperature of the Raspberry Pi is now called Processor temperature.
+
 ## 0.1.0a5 - 2026-11-03
 
 A login no longer ends when the station sets its clock after the start. Saving the
