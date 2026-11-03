@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a8 - 2026-11-03
 
 A login survives a restart of the administration, such as after an update. A reboot
 still ends it. Changing the password ends every other login.
