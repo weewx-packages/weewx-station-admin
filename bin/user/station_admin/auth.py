@@ -12,6 +12,10 @@ import time
 from user.station_admin import common
 
 SESSION_SECONDS = 12 * 3600
+# Sessions and failures live only in memory, so they count on a clock that never jumps. A
+# Raspberry Pi has no battery clock and sets the date only once it reaches a time server,
+# which can be after somebody has chosen the password.
+clock = time.monotonic
 MINIMUM_LENGTH = 8
 # scrypt parameters: about 16 MB and 50 ms per guess on a Raspberry Pi 4.
 COST = dict(n=2 ** 14, r=8, p=1)
@@ -67,7 +71,7 @@ def check_password(password):
     Returns:
         bool: True if it is correct.
     """
-    now = time.time()
+    now = clock()
     with _lock:
         _failures[:] = [moment for moment in _failures if now - moment < 60]
         if len(_failures) >= 5:
@@ -93,7 +97,7 @@ def open_session():
     """
     token = secrets.token_urlsafe(32)
     with _lock:
-        _sessions[token] = time.time() + SESSION_SECONDS
+        _sessions[token] = clock() + SESSION_SECONDS
     return token
 
 
@@ -110,7 +114,7 @@ def session_valid(token):
         expiry = _sessions.get(token)
         if expiry is None:
             return False
-        if expiry < time.time():
+        if expiry < clock():
             del _sessions[token]
             return False
     return True
