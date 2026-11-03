@@ -96,7 +96,7 @@ def post_password(handler, body):
     if not auth.check_password(str(body.get('current', ''))):
         raise Reply(403, _('The current password is wrong.'))
     try:
-        auth.set_password(str(body.get('new', '')))
+        auth.set_password(str(body.get('new', '')), keep=handler.session_token())
     except ValueError as error:
         raise Reply(400, str(error))
     return {}

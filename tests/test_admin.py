@@ -343,12 +343,32 @@ def test_first_password_opens_a_session_once(api):
     assert api('GET', 'backups', cookie=cookie.split(';')[0])[0] == 200
 
 
-def test_a_session_outlasts_the_first_time_sync(monkeypatch):
+def test_a_session_outlasts_the_first_time_sync(station, monkeypatch):
     token = auth.open_session()
     # The date a Raspberry Pi boots with can be weeks behind the time server.
     wall_clock = time.time() + 28 * 86400
     monkeypatch.setattr(time, 'time', lambda: wall_clock)
     assert auth.session_valid(token)
+
+
+def test_a_session_outlasts_a_restart_of_the_administration(station, monkeypatch):
+    token = auth.open_session()
+    stored = station / 'state' / 'sessions.json'
+    assert token not in stored.read_text() and stored.stat().st_mode & 0o777 == 0o600
+    # A new process of the service starts with nothing in memory.
+    monkeypatch.setattr(auth, '_sessions', {})
+    monkeypatch.setattr(auth, '_loaded', False)
+    assert auth.session_valid(token)
+    monkeypatch.setattr(auth, '_sessions', {})
+    monkeypatch.setattr(auth, '_loaded', False)
+    monkeypatch.setattr(auth, '_boot', lambda: 'the next boot')
+    assert not auth.session_valid(token)
+
+
+def test_a_new_password_ends_the_other_sessions(station):
+    mine, other = auth.open_session(), auth.open_session()
+    auth.set_password('another password', keep=mine)
+    assert auth.session_valid(mine) and not auth.session_valid(other)
 
 
 def test_readings_follow_the_units_of_the_weather_pages():
