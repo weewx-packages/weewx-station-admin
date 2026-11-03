@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a6 - 2026-11-03
 
 The current readings on the status page are in the units of the weather pages, with
 their unit. Before, they showed what the driver sent, such as °F for an Ecowitt console.
