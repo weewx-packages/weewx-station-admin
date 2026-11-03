@@ -235,13 +235,22 @@ const views = {
       showFields();
     };
     drawDriver(current.driver);
+    const location = field(t('Station name'), 'location', configured ? current.location : '', {required: true, maxlength: 80});
+    const title = field(t('Title of the weather pages'), 'title', current.title || (configured ? current.location : ''), {required: true, maxlength: 80});
+    // Until somebody types a title of their own, the title follows the station name.
+    let titleTyped = Boolean(current.title);
+    title.querySelector('input').addEventListener('input', () => { titleTyped = true; });
+    location.querySelector('input').addEventListener('input', event => {
+      if (!titleTyped) title.querySelector('input').value = event.target.value;
+    });
     const form = el('form', {onsubmit: event => {
       event.preventDefault();
       act('station', values(form), () => { select_tab('Status'); });
     }},
       select(t('Kind of station'), 'driver', Object.fromEntries(drivers.map(item => [item.key, item.title])), current.driver, {onchange: event => drawDriver(event.target.value)}),
       driverBox,
-      field(t('Station name'), 'location', configured ? current.location : '', {required: true, maxlength: 80}),
+      location,
+      title,
       field(t('Latitude'), 'latitude', configured ? current.latitude : '', {required: true, inputmode: 'decimal', placeholder: '52.52'}),
       field(t('Longitude'), 'longitude', configured ? current.longitude : '', {required: true, inputmode: 'decimal', placeholder: '13.40'}),
       field(t('Altitude'), 'altitude', configured ? current.altitude : '', {required: true, inputmode: 'decimal'}),
