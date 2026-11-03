@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a12 - 2026-11-03
 
 On a phone the header keeps the link to the weather pages, the language and Log out
 on one line.
