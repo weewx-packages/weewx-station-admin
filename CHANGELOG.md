@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a9 - 2026-11-03
 
 A Settings page edits weewx.conf and the settings of every report as forms, with the
 comments of the files as help and a search. A setting of a skin, such as an option of
