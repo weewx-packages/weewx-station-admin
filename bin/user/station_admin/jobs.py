@@ -7,7 +7,8 @@ import threading
 import time
 import os
 
-from user.station_admin import common
+from user.station_admin import common, i18n
+from user.station_admin.i18n import _
 
 # Empty lines a command can read. Far more than any installer or driver asks for.
 ANSWERS = 64
@@ -36,6 +37,7 @@ class Job:
         self.state = 'running'
         self.log = []
         self.started = time.time()
+        self.language = i18n.current()
 
     def write(self, line):
         """Add a line to the log.
@@ -78,7 +80,7 @@ def _run_command(job, command):
         job.write(line)
     process.wait()
     if process.returncode:
-        raise RuntimeError('The command ended with code %d.' % process.returncode)
+        raise RuntimeError(_('The command ended with code {code}.', code=process.returncode))
 
 
 def _step(job, step):
@@ -90,12 +92,13 @@ def _step(job, step):
 
 
 def _work(job, steps, cleanup):
+    i18n.use(job.language)
     try:
         for step in steps:
             _step(job, step)
         job.state = 'done'
     except Exception as error:
-        job.write('Failed: %s' % error)
+        job.write(_('Failed: {error}', error=error))
         job.state = 'failed'
     # Cleanup runs after a failure too: a failed change of the database must not
     # leave the station stopped.
@@ -103,7 +106,7 @@ def _work(job, steps, cleanup):
         try:
             _step(job, step)
         except Exception as error:
-            job.write('Failed: %s' % error)
+            job.write(_('Failed: {error}', error=error))
             job.state = 'failed'
 
 
@@ -125,7 +128,7 @@ def start(title, steps, cleanup=()):
     """
     with _lock:
         if any(job.state == 'running' for job in _jobs.values()):
-            raise Busy('Another operation is still running.')
+            raise Busy(_('Another operation is still running.'))
         job = Job(title)
         _jobs[job.id] = job
         for old in sorted(_jobs)[:-20]:

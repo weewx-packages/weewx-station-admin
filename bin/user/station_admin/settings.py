@@ -9,6 +9,7 @@ import zoneinfo
 import configobj
 
 from user.station_admin import common, drivers, extensions, jobs
+from user.station_admin.i18n import _
 
 UNITS = ('metricwx', 'metric', 'us')
 DEFAULT_LANGUAGE = 'en_GB.UTF-8'
@@ -61,11 +62,12 @@ def _number(form, name, low, high, errors):
     try:
         value = float(str(form.get(name, '')).strip().replace(',', '.'))
     except ValueError:
-        errors.append('%s must be a number.' % name.capitalize())
+        errors.append(_('{name} must be a number.', name=_(name.capitalize())))
         return None
     # The comparison also rejects nan, which float() accepts.
     if not low <= value <= high:
-        errors.append('%s must be between %g and %g.' % (name.capitalize(), low, high))
+        errors.append(_('{name} must be between {low} and {high}.', name=_(name.capitalize()),
+                        low='%g' % low, high='%g' % high))
         return None
     return value
 
@@ -103,17 +105,17 @@ def parse_station(form):
     settings['longitude'] = _number(form, 'longitude', -180, 180, errors)
     settings['altitude'] = _number(form, 'altitude', -500, 30000, errors)
     if not settings['location'] or not settings['location'].isprintable():
-        errors.append('The station needs a name.')
+        errors.append(_('The station needs a name.'))
     if settings['timezone'] not in zoneinfo.available_timezones():
-        errors.append('Time zone must be a name such as Europe/Berlin.')
+        errors.append(_('Time zone must be a name such as Europe/Berlin.'))
     if settings['units'] not in UNITS:
-        errors.append('Choose the units.')
+        errors.append(_('Choose the units.'))
     if settings['language'] not in installed_languages():
-        errors.append('Choose the language.')
+        errors.append(_('Choose the language.'))
     if settings['altitude_unit'] not in ('meter', 'foot'):
-        errors.append('Choose the unit of the altitude.')
+        errors.append(_('Choose the unit of the altitude.'))
     if settings['driver'] not in drivers.DRIVERS:
-        errors.append('Choose the kind of station.')
+        errors.append(_('Choose the kind of station.'))
     else:
         settings['options'], problems = drivers.parse(settings['driver'], form, load())
         errors.extend(problems)
@@ -162,7 +164,7 @@ def station_steps(settings):
         config = load()
         drivers.apply(key, config, settings['options'])
         save(config)
-        job.write('Saved the settings of the %s driver.' % key)
+        job.write(_('Saved the settings of the {driver} driver.', driver=key))
 
     def write_language(job):
         # Each option does one part. `lang` selects the translation and the number
@@ -173,7 +175,8 @@ def station_steps(settings):
         report['lang'] = settings['language']
         report.setdefault('Extras', {})['belchertown_locale'] = settings['language']
         save(config)
-        job.write('Set the language of the weather pages to %s.' % settings['language'])
+        job.write(_('Set the language of the weather pages to {language}.',
+                    language=settings['language']))
 
     install = extensions.package_steps(*package) if package else []
     # write_driver runs twice. weectl needs the address first, because it asks some
@@ -218,9 +221,9 @@ def write_text(text):
     try:
         parsed = configobj.ConfigObj(text.splitlines(), encoding='utf-8', interpolation=False)
     except configobj.ConfigObjError as error:
-        raise ValueError('The file is not valid: %s' % error)
+        raise ValueError(_('The file is not valid: {error}', error=error))
     if 'Station' not in parsed or 'Engine' not in parsed:
-        raise ValueError('The file has no [Station] or [Engine] section.')
+        raise ValueError(_('The file has no [Station] or [Engine] section.'))
     directory = os.path.dirname(common.CONFIG_PATH)
     shutil.copy2(common.CONFIG_PATH, common.CONFIG_PATH + '.previous')
     descriptor, temporary = tempfile.mkstemp(dir=directory, prefix='.weewx.conf.')

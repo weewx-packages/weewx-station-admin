@@ -1,10 +1,13 @@
 # Copyright (c) 2026 Manuel Hilgert <hilman2@gmail.com>
 """Smoke tests of the administration, against a temporary station."""
 
+import ast
 import http.client
 import http.server
 import json
 import os
+import pathlib
+import re
 import sqlite3
 import subprocess
 import tarfile
@@ -14,8 +17,8 @@ import time
 import configobj
 import pytest
 
-from user.station_admin import (auth, backups, common, database, drivers, extensions, jobs, live,
-                                 server, services, settings, status)
+from user.station_admin import (auth, backups, common, database, drivers, extensions, i18n, jobs,
+                                 live, server, services, settings, status)
 
 CONFIG = """
 [Station]
@@ -353,6 +356,41 @@ def test_readings_follow_the_units_of_the_weather_pages():
     converter, formatter = live.report_units(config)
     packet = dict(usUnits=1, outTemp=41.7, wh65_batt=0.0)
     assert live.readings(packet, converter, formatter) == dict(outTemp='5.4°C', wh65_batt='0')
+
+
+def marked_texts():
+    """Return every text the page and the server mark for translation."""
+    package = pathlib.Path(i18n.__file__).parent
+    script = (package / 'ui' / 'app.js').read_text(encoding='utf-8')
+    texts = {match.replace("\\'", "'") for match in re.findall(r"\bt\('((?:[^'\\]|\\.)*)'", script)}
+    # The tabs and the states of a job reach t() through a variable.
+    texts.update(re.findall(r'^  async (\w+)\(\)', script, re.MULTILINE))
+    texts.update(('running', 'done', 'failed'))
+    for path in package.glob('*.py'):
+        for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+            if isinstance(node, ast.Call) and getattr(node.func, 'id', None) in ('_', 'N_') \
+                    and isinstance(node.args[0], ast.Constant):
+                texts.add(node.args[0].value)
+    return texts
+
+
+def test_every_text_has_a_german_translation():
+    german = i18n.catalog('de')
+    placeholders = re.compile(r'\{\w+\}')
+    for text in marked_texts():
+        assert text in german, text
+        assert set(placeholders.findall(text)) == set(placeholders.findall(german[text])), text
+
+
+def test_the_server_answers_in_the_language_of_the_page(api):
+    headers = {'X-Station-Admin': '1', 'X-Language': 'de'}
+    reply = api('POST', 'setup-password', dict(password='short'), headers=headers)
+    assert reply[2]['error'] == 'Das Passwort braucht mindestens 8 Zeichen.'
+    assert api('POST', 'setup-password', dict(password='short'))[2]['error'].startswith('The')
+
+
+def test_a_machine_without_a_raspberry_firmware_has_a_status(station):
+    assert status.raspberry(False)['kernel'] == os.uname().release
 
 
 def test_posts_from_other_pages_are_refused(api):

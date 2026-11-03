@@ -4,6 +4,7 @@
 import re
 
 from user.station_admin import common, settings, status
+from user.station_admin.i18n import N_, _
 
 # The fields each service needs. A field of kind 'secret' is never sent to the
 # page: it can only be replaced. Names are options in weewx.conf.
@@ -17,10 +18,10 @@ UPLOADS = {
     'CWOP': dict(title='CWOP', fields=[('station', 'text'), ('passcode', 'secret')]),
 }
 TRANSFERS = {
-    'FTP': dict(title='Copy the website by FTP', fields=[
+    'FTP': dict(title=N_('Copy the website by FTP'), fields=[
         ('server', 'text'), ('user', 'text'), ('password', 'secret'), ('path', 'text'),
         ('port', 'text')]),
-    'RSYNC': dict(title='Copy the website by rsync', fields=[
+    'RSYNC': dict(title=N_('Copy the website by rsync'), fields=[
         ('server', 'text'), ('user', 'text'), ('path', 'text')]),
 }
 OBSERVATION = re.compile(r'^[A-Za-z_][A-Za-z0-9_.-]*$')
@@ -36,7 +37,8 @@ def _describe(section, definition):
         else:
             value = section.get(name, '')
             values[name] = '' if value == 'replace_me' else value
-    return dict(title=definition['title'], enable=str(section.get('enable', 'false')).lower() == 'true',
+    enable = str(section.get('enable', 'false')).lower() == 'true'
+    return dict(title=_(definition['title']), enable=enable,
                 fields=[dict(name=name, kind=kind) for name, kind in definition['fields']],
                 values=values, secrets_set=secrets_set)
 
@@ -76,7 +78,7 @@ def write_upload(config, name, form):
     elif name in TRANSFERS:
         definition, parent = TRANSFERS[name], config['StdReport']
     else:
-        raise ValueError('Unknown service.')
+        raise ValueError(_('Unknown service.'))
     section = parent.setdefault(name, {})
     section['enable'] = 'true' if form.get('enable') else 'false'
     if name in TRANSFERS:
@@ -116,7 +118,7 @@ def write_report(config, name, enable):
         ValueError: The report is unknown.
     """
     if name not in config['StdReport'].sections or name == 'Defaults':
-        raise ValueError('Unknown report.')
+        raise ValueError(_('Unknown report.'))
     config['StdReport'][name]['enable'] = 'true' if enable else 'false'
 
 
@@ -145,8 +147,9 @@ def read_sensors(config, columns):
         columns (Iterable[str]): Columns of the archive.
 
     Returns:
-        dict: observations, each with name, value and whether a column keeps
-            it, and mapping, the entries of the driver's map.
+        dict: observations, each with name, the reading as text in the units of the
+            weather pages and whether a column keeps it, and mapping, the entries of
+            the driver's map.
     """
     known = set(columns)
     packet = status.live() or {}
@@ -171,8 +174,8 @@ def write_mapping(config, mapping):
     """
     section, subsection = _map_section(config)
     if section is None:
-        raise ValueError('This driver has no map.')
+        raise ValueError(_('This driver has no map.'))
     for left, right in mapping.items():
         if not OBSERVATION.match(str(left)) or not OBSERVATION.match(str(right)):
-            raise ValueError('Names have letters, digits, dots and underscores.')
+            raise ValueError(_('Names have letters, digits, dots and underscores.'))
     section[subsection] = dict(mapping)

@@ -7,6 +7,7 @@ import time
 import urllib.request
 
 from user.station_admin import common
+from user.station_admin.i18n import _
 
 CATALOG_URL = 'https://raw.githubusercontent.com/weewx-packages/catalog/main/repository.json'
 PACKAGE_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._+-]*$')
@@ -92,7 +93,7 @@ def package_steps(package_id, pre=False):
         OSError: The package needs the catalog, and it cannot be read.
     """
     if not PACKAGE_NAME.match(package_id):
-        raise ValueError('Not a package name.')
+        raise ValueError(_('Not a package name.'))
     command = ['install', package_id, '--repo', 'packages', '--yes']
     return _debian_packages(package_id) + [
         common.package_command(*command + ['--pre'] if pre else command)]
@@ -128,7 +129,7 @@ def update_steps(package_id=None):
     arguments = ['update', '--yes']
     if package_id is not None:
         if not PACKAGE_NAME.match(package_id):
-            raise ValueError('Not a package name.')
+            raise ValueError(_('Not a package name.'))
         arguments.insert(1, package_id)
     # The administration can be one of the updated packages. It restarts itself
     # last, because that ends this job.
@@ -149,9 +150,9 @@ def remove_steps(name):
         ValueError: The name is not valid, or removing it would cut off this page.
     """
     if not PACKAGE_NAME.match(name):
-        raise ValueError('Not a package name.')
+        raise ValueError(_('Not a package name.'))
     if name in ('station-admin', 'package-manager'):
-        raise ValueError('The administration needs %s.' % name)
+        raise ValueError(_('The administration needs {name}.', name=name))
     return [['weectl', 'extension', 'uninstall', name, '--config=' + common.CONFIG_PATH, '-y'],
             common.privileged('weewx-restart')]
 

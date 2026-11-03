@@ -13,6 +13,7 @@ import os
 import re
 
 from user.station_admin import common
+from user.station_admin.i18n import N_, _
 
 # weewx.conf holds these as they are, and a host, a device or a key never has spaces.
 PLAIN_VALUE = re.compile(r'^[\x21-\x7e]+$')
@@ -29,7 +30,7 @@ def _text(name, label, option, default='', optional=False, when=None):
 
 
 def _port(default):
-    return dict(name='port', label='Port', kind='port', option='port', default=default,
+    return dict(name='port', label=N_('Port'), kind='port', option='port', default=default,
                 optional=False, when=None)
 
 
@@ -53,71 +54,72 @@ def _netatmo_tokens():
 
 DRIVERS = {
     'rtldavis': dict(
-        title='Davis, through an RTL-SDR dongle', module='user.rtldavis', section='Rtldavis',
+        title=N_('Davis, through an RTL-SDR dongle'), module='user.rtldavis', section='Rtldavis',
         fields=(
-            _choice('band', 'Frequency band', 'transceiver_frequency',
+            _choice('band', N_('Frequency band'), 'transceiver_frequency',
                     {'EU': 'EU, 868 MHz', 'US': 'US, 915 MHz', 'NZ': 'NZ, 921 MHz'}, 'EU'),
-            _choice('channel', 'ISS channel, as shown on the console', 'iss_channel',
+            _choice('channel', N_('ISS channel, as shown on the console'), 'iss_channel',
                     {str(number): str(number) for number in range(1, 9)}, '1'),
-            _choice('bucket', 'Rain bucket', 'rain_bucket_type',
-                    {'1': '0.2 mm per tip', '0': '0.01 inch per tip'}, '1'))),
+            _choice('bucket', N_('Rain bucket'), 'rain_bucket_type',
+                    {'1': N_('0.2 mm per tip'), '0': N_('0.01 inch per tip')}, '1'))),
     'vantage': dict(
-        title='Davis, through a WeatherLink logger', module='weewx.drivers.vantage',
+        title=N_('Davis, through a WeatherLink logger'), module='weewx.drivers.vantage',
         section='Vantage',
         fields=(
-            _choice('connection', 'Connection to the logger', 'type',
-                    {'serial': 'USB or serial', 'ethernet': 'Network (WeatherLinkIP)'}, 'serial'),
-            _text('device', 'Device of the logger', 'port', '/dev/ttyUSB0',
+            _choice('connection', N_('Connection to the logger'), 'type',
+                    {'serial': N_('USB or serial'),
+                     'ethernet': N_('Network (WeatherLinkIP)')}, 'serial'),
+            _text('device', N_('Device of the logger'), 'port', '/dev/ttyUSB0',
                   when=('connection', 'serial')),
-            _text('host', 'Address of the logger', 'host', when=('connection', 'ethernet')))),
+            _text('host', N_('Address of the logger'), 'host', when=('connection', 'ethernet')))),
     'wll': dict(
-        title='Davis WeatherLink Live', module='user.wll', section='WLL', package='wll',
-        fields=(_text('host', 'Address of the WeatherLink Live', 'host'),),
-        note='Give the WeatherLink Live a fixed address in your router.'),
+        title=N_('Davis WeatherLink Live'), module='user.wll', section='WLL', package='wll',
+        fields=(_text('host', N_('Address of the WeatherLink Live'), 'host'),),
+        note=N_('Give the WeatherLink Live a fixed address in your router.')),
     'davis-cloud': dict(
-        title='Davis WeatherLink Console, through the WeatherLink cloud',
+        title=N_('Davis WeatherLink Console, through the WeatherLink cloud'),
         module='user.daviscloud.driver', section='DavisCloud', package='davis-cloud', pre=True,
         # WeeWX makes the records. The other way, reading them from the cloud archive,
         # needs historic access on the WeatherLink account, which this page cannot check.
         archive='software',
-        fields=(_secret('api_key', 'API key', 'api_key'),
-                _secret('api_secret', 'API secret', 'api_secret'),
-                _text('station_id', 'Station ID, only for an account with several stations',
+        fields=(_secret('api_key', N_('API key'), 'api_key'),
+                _secret('api_secret', N_('API secret'), 'api_secret'),
+                _text('station_id', N_('Station ID, only for an account with several stations'),
                       'station_id', optional=True)),
-        note='Create the API key and secret on weatherlink.com, under Account.'),
+        note=N_('Create the API key and secret on weatherlink.com, under Account.')),
     'ecowitt': dict(
-        title='Ecowitt or Froggit console, sending to this station',
+        title=N_('Ecowitt or Froggit console, sending to this station'),
         module='user.ecowittcustom', section='Ecowittcustom',
         fields=(_port('8080'),),
-        note='In WS View Plus under Weather Services, Customized, set: protocol Ecowitt, '
-             'server {address}, path /, this port, interval 60 seconds.'),
+        note=N_('In WS View Plus under Weather Services, Customized, set: protocol Ecowitt, '
+                'server {address}, path /, this port, interval 60 seconds.')),
     'ecowitt-gateway': dict(
-        title='Ecowitt or Froggit console, read over the network',
+        title=N_('Ecowitt or Froggit console, read over the network'),
         module='user.weewx-EcowittGateway', section='EcowittGateway', package='ecowittgateway',
-        fields=(_text('host', 'Address of the console or gateway', 'ip_address'),),
-        note='Give the console a fixed address in your router. Nothing has to be set on it.'),
+        fields=(_text('host', N_('Address of the console or gateway'), 'ip_address'),),
+        note=N_('Give the console a fixed address in your router. Nothing has to be set on it.')),
     'ambient': dict(
-        title='Ambient Weather console', module='user.ambient_http_push',
+        title=N_('Ambient Weather console'), module='user.ambient_http_push',
         section='AmbientHTTPPush', package='ambient-http-push', pre=True,
         fields=(_port('8080'),),
-        note='In the awnet app under Device Settings, Customized Upload, set: protocol '
-             'Ambient Weather, server {address}, path /data?, this port, interval 60 seconds.'),
+        note=N_('In the awnet app under Device Settings, Customized Upload, set: protocol '
+                'Ambient Weather, server {address}, path /data?, this port, interval 60 seconds.')),
     'tempest': dict(
-        title='WeatherFlow Tempest', module='user.tempest_udp', section='TempestUDP',
+        title=N_('WeatherFlow Tempest'), module='user.tempest_udp', section='TempestUDP',
         package='tempest-udp', pre=True, fields=(),
-        note='Nothing has to be set. The hub must be on the same network as this station.'),
+        note=N_('Nothing has to be set. The hub must be on the same network as this station.')),
     'netatmo': dict(
-        title='Netatmo, through the Netatmo cloud', module='user.netatmo', section='netatmo',
+        title=N_('Netatmo, through the Netatmo cloud'), module='user.netatmo', section='netatmo',
         package='netatmo',
-        fields=(_text('client_id', 'Client ID', 'client_id'),
-                _secret('client_secret', 'Client secret', 'client_secret'),
-                _secret('refresh_token', 'Refresh token', None)),
-        note='Create an app on dev.netatmo.com. Its page shows the client ID and secret, and '
-             'its token generator gives the refresh token, with the scope read_station.'),
+        fields=(_text('client_id', N_('Client ID'), 'client_id'),
+                _secret('client_secret', N_('Client secret'), 'client_secret'),
+                _secret('refresh_token', N_('Refresh token'), None)),
+        note=N_('Create an app on dev.netatmo.com. Its page shows the client ID and secret, '
+                'and its token generator gives the refresh token, with the scope read_station.')),
     'simulator': dict(
-        title='Simulated station, to try this out', module='weewx.drivers.simulator',
+        title=N_('Simulated station, to try this out'), module='weewx.drivers.simulator',
         section='Simulator', fields=(),
-        note='This station makes up its readings and stores them in the database.'),
+        note=N_('This station makes up its readings and stores them in the database.')),
 }
 
 
@@ -171,12 +173,16 @@ def describe(config):
         for field in driver['fields']:
             stored = _stored(field, section)
             entry = {name: value for name, value in field.items() if name != 'option'}
+            entry['label'] = _(field['label'])
+            if 'choices' in field:
+                entry['choices'] = {key: _(text) for key, text in field['choices'].items()}
             if field['kind'] == 'secret':
                 entry.update(value='', stored=bool(stored))
             else:
                 entry['value'] = stored or field['default']
             fields.append(entry)
-        kinds.append(dict(key=key, title=driver['title'], note=driver.get('note'), fields=fields))
+        note = _(driver['note']) if 'note' in driver else None
+        kinds.append(dict(key=key, title=_(driver['title']), note=note, fields=fields))
     return kinds
 
 
@@ -207,18 +213,20 @@ def parse(key, form, config):
         value = str(form.get(name, '')).strip()
         if field['kind'] == 'choice':
             if value not in field['choices']:
-                errors.append('Choose: %s.' % field['label'])
+                errors.append(_('Choose: {label}.', label=_(field['label'])))
         elif field['kind'] == 'port':
             if not value.isascii() or not value.isdigit() \
                     or not LOWEST_PORT <= int(value) <= HIGHEST_PORT:
-                errors.append('Port must be between %d and %d.' % (LOWEST_PORT, HIGHEST_PORT))
+                errors.append(_('Port must be between {low} and {high}.', low=LOWEST_PORT,
+                                high=HIGHEST_PORT))
         elif not value:
             if field['kind'] == 'secret' and _stored(field, section):
                 continue
             if not field['optional']:
-                errors.append('Enter: %s.' % field['label'])
+                errors.append(_('Enter: {label}.', label=_(field['label'])))
         elif not PLAIN_VALUE.match(value):
-            errors.append('%s holds a character that is not allowed.' % field['label'])
+            errors.append(_('{label} holds a character that is not allowed.',
+                            label=_(field['label'])))
         values[name] = value
     return values, errors
 
