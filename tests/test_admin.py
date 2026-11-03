@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import tarfile
 import threading
+import time
 
 import pytest
 
@@ -336,6 +337,14 @@ def test_first_password_opens_a_session_once(api):
     assert status_code == 200 and 'HttpOnly' in cookie and 'SameSite=Strict' in cookie
     assert api('POST', 'setup-password', dict(password='another password'))[0] == 403
     assert api('GET', 'backups', cookie=cookie.split(';')[0])[0] == 200
+
+
+def test_a_session_outlasts_the_first_time_sync(monkeypatch):
+    token = auth.open_session()
+    # The date a Raspberry Pi boots with can be weeks behind the time server.
+    wall_clock = time.time() + 28 * 86400
+    monkeypatch.setattr(time, 'time', lambda: wall_clock)
+    assert auth.session_valid(token)
 
 
 def test_posts_from_other_pages_are_refused(api):

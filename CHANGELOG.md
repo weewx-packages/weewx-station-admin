@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+A login no longer ends when the station sets its clock after the start. Saving the
+first settings of a new station failed with "Log in first." for this reason.
+
 ## 0.1.0a4 - 2026-11-01
 
 The station page offers more kinds of station: Davis through a WeatherLink logger,
