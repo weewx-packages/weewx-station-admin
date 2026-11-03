@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a10 - 2026-11-03
 
 The station page asks for the title of the weather pages. It follows the station name
 until you type your own, and sets `site_title` and `manifest_name` of Belchertown.
