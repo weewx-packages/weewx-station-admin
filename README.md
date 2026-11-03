@@ -26,6 +26,9 @@ requirements, and the install, update and removal commands.
 The administration has no options. It listens on port 8377 of the loopback
 interface, and nginx forwards `/admin/` to it from the local network only.
 
+The page is in English and German. It starts in the first language of the browser it
+knows, and the menu at the top switches it for that browser.
+
 The **Station** page offers these kinds of station. It installs the driver from the
 catalog when you choose one that the station does not have yet.
 
@@ -58,6 +61,10 @@ python -m pytest -q tests
 ```
 
 Run it in an environment with WeeWX and pytest, with `bin` on `PYTHONPATH`.
+
+Texts are English in the code. `ui/i18n/de.json` translates each of them, for the page
+and for the messages of the server. A test fails when a marked text has no German
+translation.
 
 ## License
 

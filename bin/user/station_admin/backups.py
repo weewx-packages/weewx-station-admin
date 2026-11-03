@@ -16,13 +16,14 @@ import tempfile
 import time
 
 from user.station_admin import common, settings
+from user.station_admin.i18n import _
 
 NAME = re.compile(r'^[A-Za-z0-9._-]+\.tar\.gz$')
 
 
 def _path(name):
     if not NAME.match(name) or '..' in name:
-        raise ValueError('Not a backup name.')
+        raise ValueError(_('Not a backup name.'))
     return os.path.join(common.BACKUP_DIR, name)
 
 
@@ -40,7 +41,7 @@ def path_of(name):
     """
     path = _path(name)
     if not os.path.exists(path):
-        raise ValueError('No such backup.')
+        raise ValueError(_('No such backup.'))
     return path
 
 
@@ -78,13 +79,13 @@ def create_step(job):
     os.makedirs(common.BACKUP_DIR, mode=0o700, exist_ok=True)
     size = os.path.getsize(common.DATABASE_PATH) if os.path.exists(common.DATABASE_PATH) else 0
     if shutil.disk_usage(common.BACKUP_DIR).free < 2 * size + 50 * 1024 * 1024:
-        raise RuntimeError('Not enough free space for a backup.')
+        raise RuntimeError(_('Not enough free space for a backup.'))
     stamp = time.strftime('%Y%m%d-%H%M%S')
     name = 'station-%s.tar.gz' % stamp
     with tempfile.TemporaryDirectory(dir=common.BACKUP_DIR) as work:
         copy = os.path.join(work, 'weewx.sdb')
         if size:
-            job.write('Copying the database.')
+            job.write(_('Copying the database.'))
             source = sqlite3.connect('file:%s?mode=ro' % common.DATABASE_PATH, uri=True)
             target = sqlite3.connect(copy)
             try:
@@ -93,7 +94,7 @@ def create_step(job):
             finally:
                 source.close()
                 target.close()
-        job.write('Packing %s.' % name)
+        job.write(_('Packing {name}.', name=name))
         temporary = os.path.join(work, name)
         descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT, 0o600)
         os.close(descriptor)
@@ -109,7 +110,7 @@ def create_step(job):
             if size:
                 archive.add(copy, 'weewx.sdb')
         os.replace(temporary, _path(name))
-    job.write('Backup %s is ready.' % name)
+    job.write(_('Backup {name} is ready.', name=name))
 
 
 def restore_step(name):
@@ -130,17 +131,17 @@ def restore_step(name):
                 # directory, so an uploaded archive cannot write elsewhere.
                 archive.extractall(work, filter='data')
             if not os.path.exists(os.path.join(work, 'MANIFEST.json')):
-                raise RuntimeError('This is not a backup of a station.')
+                raise RuntimeError(_('This is not a backup of a station.'))
             settings.load(os.path.join(work, 'weewx.conf'))
-            job.write('Restoring the configuration.')
+            job.write(_('Restoring the configuration.'))
             shutil.copyfile(os.path.join(work, 'weewx.conf'), common.CONFIG_PATH)
-            job.write('Restoring extensions and skins.')
+            job.write(_('Restoring extensions and skins.'))
             shutil.copytree(os.path.join(work, 'bin/user'), common.USER_ROOT, dirs_exist_ok=True)
             shutil.copytree(os.path.join(work, 'skins'), common.SKIN_ROOT, dirs_exist_ok=True)
             database = os.path.join(work, 'weewx.sdb')
             if os.path.exists(database):
-                job.write('Restoring the database.')
+                job.write(_('Restoring the database.'))
                 shutil.copyfile(database, common.DATABASE_PATH)
-        job.write('Restored %s.' % name)
+        job.write(_('Restored {name}.', name=name))
 
     return restore

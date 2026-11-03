@@ -14,13 +14,17 @@ import time
 import urllib.parse
 import uuid
 
-from user.station_admin import (VERSION, auth, backups, common, database, drivers, extensions, jobs,
-                                services, settings, status)
+from user.station_admin import (VERSION, auth, backups, common, database, drivers, extensions, i18n,
+                                jobs, services, settings, status)
+from user.station_admin.i18n import _
 
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
 STATIC = {'/admin/': ('index.html', 'text/html; charset=utf-8'),
           '/admin/app.js': ('app.js', 'text/javascript; charset=utf-8'),
           '/admin/style.css': ('style.css', 'text/css; charset=utf-8')}
+STATIC.update({'/admin/i18n/%s.json' % language: ('i18n/%s.json' % language,
+                                                 'application/json; charset=utf-8')
+               for language in i18n.LANGUAGES if language != i18n.DEFAULT})
 COOKIE = 'station_admin'
 MAX_JSON = 4 * 1024 * 1024
 MAX_UPLOAD = 2 * 1024 * 1024 * 1024
@@ -66,7 +70,7 @@ def get_session(handler):
 def post_setup_password(handler, body):
     # Only the first visitor gets this far: afterwards a password exists.
     if auth.has_password():
-        raise Reply(403, 'The password is already set.')
+        raise Reply(403, _('The password is already set.'))
     try:
         auth.set_password(str(body.get('password', '')))
     except ValueError as error:
@@ -78,7 +82,7 @@ def post_setup_password(handler, body):
 def post_login(handler, body):
     if not auth.check_password(str(body.get('password', ''))):
         time.sleep(1)
-        raise Reply(403, 'Wrong password, or too many attempts. Wait a minute.')
+        raise Reply(403, _('Wrong password, or too many attempts. Wait a minute.'))
     handler.open_session()
     return {}
 
@@ -90,7 +94,7 @@ def post_logout(handler, body):
 
 def post_password(handler, body):
     if not auth.check_password(str(body.get('current', ''))):
-        raise Reply(403, 'The current password is wrong.')
+        raise Reply(403, _('The current password is wrong.'))
     try:
         auth.set_password(str(body.get('new', '')))
     except ValueError as error:
@@ -118,8 +122,8 @@ def post_station(handler, body):
     try:
         steps = settings.station_steps(parsed)
     except OSError as error:
-        raise Reply(502, 'The catalog cannot be read: %s' % error)
-    return _start('Save the station settings', steps)
+        raise Reply(502, _('The catalog cannot be read: {error}', error=error))
+    return _start(_('Save the station settings'), steps)
 
 
 def get_sensors(handler):
@@ -134,7 +138,7 @@ def post_sensors(handler, body):
     except ValueError as error:
         raise Reply(400, str(error))
     settings.save(config)
-    return _start('Apply the sensor map', [common.privileged('weewx-restart')])
+    return _start(_('Apply the sensor map'), [common.privileged('weewx-restart')])
 
 
 def get_database(handler):
@@ -153,7 +157,7 @@ def get_extensions(handler):
     try:
         catalog, error = extensions.catalog(), None
     except OSError as problem:
-        catalog, error = [], 'The catalog cannot be read: %s' % problem
+        catalog, error = [], _('The catalog cannot be read: {error}', error=problem)
     return dict(installed=extensions.installed(), catalog=catalog, error=error)
 
 
@@ -162,21 +166,21 @@ def post_extensions(handler, body):
     name = str(body.get('name', ''))
     try:
         if action == 'install':
-            return _start('Install %s' % name, extensions.install_steps(name))
+            return _start(_('Install {name}', name=name), extensions.install_steps(name))
         if action == 'update':
-            return _start('Update %s' % name, extensions.update_steps(name))
+            return _start(_('Update {name}', name=name), extensions.update_steps(name))
         if action == 'update-all':
-            return _start('Update all packages', extensions.update_steps())
+            return _start(_('Update all packages'), extensions.update_steps())
         if action == 'remove':
-            return _start('Remove %s' % name, extensions.remove_steps(name))
+            return _start(_('Remove {name}', name=name), extensions.remove_steps(name))
     except ValueError as error:
         raise Reply(400, str(error))
-    raise Reply(400, 'Unknown action.')
+    raise Reply(400, _('Unknown action.'))
 
 
 def put_extension_upload(handler, query):
     path = handler.store_upload()
-    return _start('Install an uploaded extension', extensions.upload_steps(path),
+    return _start(_('Install an uploaded extension'), extensions.upload_steps(path),
                   [lambda job: os.remove(path)])
 
 
@@ -186,7 +190,7 @@ def get_reports(handler):
 
 def post_reports(handler, body):
     if body.get('action') == 'generate':
-        return _start('Generate the reports',
+        return _start(_('Generate the reports'),
                       [['weectl', 'report', 'run', '--config=' + common.CONFIG_PATH]])
     config = settings.load()
     try:
@@ -194,7 +198,7 @@ def post_reports(handler, body):
     except ValueError as error:
         raise Reply(400, str(error))
     settings.save(config)
-    return _start('Apply the report settings', [common.privileged('weewx-restart')])
+    return _start(_('Apply the report settings'), [common.privileged('weewx-restart')])
 
 
 def get_uploads(handler):
@@ -208,7 +212,7 @@ def post_uploads(handler, body):
     except ValueError as error:
         raise Reply(400, str(error))
     settings.save(config)
-    return _start('Apply the upload settings', [common.privileged('weewx-restart')])
+    return _start(_('Apply the upload settings'), [common.privileged('weewx-restart')])
 
 
 def get_backups(handler):
@@ -219,18 +223,18 @@ def post_backups(handler, body):
     action = body.get('action')
     try:
         if action == 'create':
-            return _start('Create a backup', [backups.create_step])
+            return _start(_('Create a backup'), [backups.create_step])
         if action == 'delete':
             backups.remove(str(body.get('name')))
             return {}
         if action == 'restore':
-            return _start('Restore %s' % body.get('name'),
+            return _start(_('Restore {name}', name=body.get('name')),
                           [common.privileged('weewx-stop'),
                            backups.restore_step(str(body.get('name')))],
                           [common.privileged('weewx-start')])
     except ValueError as error:
         raise Reply(400, str(error))
-    raise Reply(400, 'Unknown action.')
+    raise Reply(400, _('Unknown action.'))
 
 
 def put_backup_upload(handler, query):
@@ -249,18 +253,20 @@ def post_config(handler, body):
         settings.write_text(str(body.get('text', '')))
     except ValueError as error:
         raise Reply(400, str(error))
-    return _start('Apply the configuration', [common.privileged('weewx-restart')])
+    return _start(_('Apply the configuration'), [common.privileged('weewx-restart')])
 
 
 def post_system(handler, body):
     action = body.get('action')
     if action == 'restart-weewx':
-        return _start('Restart WeeWX', [common.privileged('weewx-restart')])
+        return _start(_('Restart WeeWX'), [common.privileged('weewx-restart')])
     if action == 'upgrade':
-        return _start('Update the system', [common.privileged('apt-upgrade')])
-    if action in ('reboot', 'poweroff'):
-        return _start(action.capitalize(), [common.privileged(action)])
-    raise Reply(400, 'Unknown action.')
+        return _start(_('Update the system'), [common.privileged('apt-upgrade')])
+    if action == 'reboot':
+        return _start(_('Reboot'), [common.privileged(action)])
+    if action == 'poweroff':
+        return _start(_('Shut down'), [common.privileged(action)])
+    raise Reply(400, _('Unknown action.'))
 
 
 def get_jobs(handler):
@@ -336,13 +342,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def require(self, needs_login):
         if needs_login and not self.authenticated():
-            raise Reply(401, 'Log in first.')
+            raise Reply(401, _('Log in first.'))
 
     def require_page(self):
         if not self.headers.get(CSRF_HEADER):
-            raise Reply(403, 'This request did not come from the page.')
+            raise Reply(403, _('This request did not come from the page.'))
 
     def do_GET(self):
+        i18n.use(self.headers.get('X-Language'))
         path = urllib.parse.urlsplit(self.path).path
         if path in STATIC:
             name, content_type = STATIC[path]
@@ -357,7 +364,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         name = path[len('/admin/api/'):] if path.startswith('/admin/api/') else None
         if name not in GET:
-            self.reply_json(dict(error='Not found.'), 404)
+            self.reply_json(dict(error=_('Not found.')), 404)
             return
         function, needs_login = GET[name]
 
@@ -371,12 +378,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.require(True)
         job = jobs.get(int(number)) if number.isdigit() else None
         if job is None:
-            raise Reply(404, 'No such job.')
+            raise Reply(404, _('No such job.'))
         return job.describe()
 
     def download(self, name):
         if not self.authenticated():
-            self.reply_json(dict(error='Log in first.'), 401)
+            self.reply_json(dict(error=_('Log in first.')), 401)
             return
         try:
             path = backups.path_of(name)
@@ -392,30 +399,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
             shutil.copyfileobj(stream, self.wfile, 1024 * 1024)
 
     def do_POST(self):
+        i18n.use(self.headers.get('X-Language'))
         path = urllib.parse.urlsplit(self.path).path
         name = path[len('/admin/api/'):] if path.startswith('/admin/api/') else None
         length = int(self.headers.get('Content-Length') or 0)
         if length > MAX_JSON:
             self.close_connection = True
-            self.reply_json(dict(error='The request is too large.'), 413)
+            self.reply_json(dict(error=_('The request is too large.')), 413)
             return
         raw = self.rfile.read(length)
 
         def work():
             self.require_page()
             if name not in POST:
-                raise Reply(404, 'Not found.')
+                raise Reply(404, _('Not found.'))
             function, needs_login = POST[name]
             self.require(needs_login)
             try:
                 body = json.loads(raw or b'{}')
             except ValueError:
-                raise Reply(400, 'The request is no JSON.')
+                raise Reply(400, _('The request is no JSON.'))
             return function(self, body)
 
         self.handle_api(work)
 
     def do_PUT(self):
+        i18n.use(self.headers.get('X-Language'))
         path = urllib.parse.urlsplit(self.path).path
         name = path[len('/admin/api/'):] if path.startswith('/admin/api/') else None
 
@@ -423,7 +432,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.require_page()
             self.require(True)
             if name not in PUT:
-                raise Reply(404, 'Not found.')
+                raise Reply(404, _('Not found.'))
             return PUT[name](self, urllib.parse.urlsplit(self.path).query)
 
         self.handle_api(work)
@@ -440,10 +449,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         length = int(self.headers.get('Content-Length') or 0)
         if not 0 < length < MAX_UPLOAD:
             self.close_connection = True
-            raise Reply(413, 'The upload is empty or too large.')
+            raise Reply(413, _('The upload is empty or too large.'))
         if shutil.disk_usage(common.STATE_DIR).free < 2 * length:
             self.close_connection = True
-            raise Reply(507, 'Not enough free space.')
+            raise Reply(507, _('Not enough free space.'))
         name = os.path.basename(urllib.parse.parse_qs(
             urllib.parse.urlsplit(self.path).query).get('name', ['upload.tar.gz'])[0])
         suffix = '.zip' if name.endswith('.zip') else '.tar.gz'

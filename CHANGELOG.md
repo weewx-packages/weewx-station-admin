@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+The page is in English and German. It follows the language of the browser, and a menu
+at the top switches it. Messages of the server and of running operations follow the
+same choice.
+
+The status page has its own section for the Raspberry Pi: model, processor
+temperature, power supply, disk, memory, running time, address, host name, system,
+kernel and versions. It warns when the power supply is too weak.
+
+The Sensors page shows the readings again, instead of NaN since 0.1.0a6. Its sensor
+map now works: the page could not show the entries of the map or add one.
+
 ## 0.1.0a6 - 2026-11-03
 
 The current readings on the status page are in the units of the weather pages, with

@@ -8,26 +8,30 @@ import socket
 import sqlite3
 import time
 
-from user.station_admin import common
+from user.station_admin import VERSION, common
+from user.station_admin.i18n import N_, _
 
 # Log messages of the drivers, as text to find and what to tell the user. The
 # newest line that matches decides.
 RECEPTION = (
-    ('No RTL-SDR dongle found', 'Plug in the RTL-SDR dongle.'),
-    ('No permission to open the RTL-SDR dongle', 'WeeWX may not open the dongle. See the log.'),
-    ('The RTL-SDR dongle is in use', 'Another program holds the dongle. See the log.'),
-    ('Searching for transmitter', 'Searching for your station. This can take a few minutes.'),
-    ('Heard a Davis transmitter on channel', 'Another Davis channel is on the air. Check the ISS channel.'),
-    ('No Davis transmitter heard', 'Nothing received. Check band, channel and antenna.'),
-    ('Lost transmitter', 'Reception was lost. The receiver is trying again.'),
-    ('Found a Davis transmitter', 'Station found. Waiting for it to stay in sync.'),
-    ('Receiving transmitter', 'Receiving your station.'),
-    ('listen on', 'Waiting for the first upload from your console.'),
+    ('No RTL-SDR dongle found', N_('Plug in the RTL-SDR dongle.')),
+    ('No permission to open the RTL-SDR dongle',
+     N_('WeeWX may not open the dongle. See the log.')),
+    ('The RTL-SDR dongle is in use', N_('Another program holds the dongle. See the log.')),
+    ('Searching for transmitter', N_('Searching for your station. This can take a few minutes.')),
+    ('Heard a Davis transmitter on channel',
+     N_('Another Davis channel is on the air. Check the ISS channel.')),
+    ('No Davis transmitter heard', N_('Nothing received. Check band, channel and antenna.')),
+    ('Lost transmitter', N_('Reception was lost. The receiver is trying again.')),
+    ('Found a Davis transmitter', N_('Station found. Waiting for it to stay in sync.')),
+    ('Receiving transmitter', N_('Receiving your station.')),
+    ('listen on', N_('Waiting for the first upload from your console.')),
     ('Waiting for uploads from an Ambient Weather console',
-     'Waiting for the first upload from your console.'),
-    ('Waiting for broadcasts from a WeatherFlow hub', 'Waiting for the first broadcast of the hub.'),
+     N_('Waiting for the first upload from your console.')),
+    ('Waiting for broadcasts from a WeatherFlow hub',
+     N_('Waiting for the first broadcast of the hub.')),
     ('No broadcast from a WeatherFlow hub',
-     'Nothing received. The hub must be on the same network as this station.'),
+     N_('Nothing received. The hub must be on the same network as this station.')),
 )
 
 
@@ -111,6 +115,62 @@ def _temperature():
         return None
 
 
+def _read(path):
+    try:
+        with open(path, encoding='utf-8', errors='replace') as stream:
+            return stream.read().replace('\0', '').strip()
+    except OSError:
+        return None
+
+
+def _undervoltage():
+    """Tell whether the power supply of the Raspberry Pi is too weak right now.
+
+    Returns:
+        bool|None: True if the firmware reports undervoltage, or None on a machine
+            that does not report it.
+    """
+    # The firmware of the Raspberry Pi reports through the hwmon device rpi_volt. Its
+    # alarm stays set while the voltage is too low.
+    try:
+        devices = os.listdir('/sys/class/hwmon')
+    except OSError:
+        return None
+    for device in devices:
+        path = os.path.join('/sys/class/hwmon', device)
+        if _read(os.path.join(path, 'name')) == 'rpi_volt':
+            alarm = _read(os.path.join(path, 'in0_lcrit_alarm'))
+            return None if alarm is None else alarm == '1'
+    return None
+
+
+def _system():
+    for line in (_read('/etc/os-release') or '').splitlines():
+        if line.startswith('PRETTY_NAME='):
+            return line.partition('=')[2].strip('"')
+    return None
+
+
+def raspberry(time_synced):
+    """Collect what the status page shows about the Raspberry Pi.
+
+    Args:
+        time_synced (bool): Whether the clock has the time from the internet.
+
+    Returns:
+        dict: Model, system, kernel, host name, processor temperature, undervoltage,
+            disk, memory, uptime, address, whether the time is synchronized, and the
+            releases of the image and of this administration.
+    """
+    disk = shutil.disk_usage(os.path.dirname(common.DATABASE_PATH))
+    return dict(model=_read('/proc/device-tree/model'), system=_system(),
+                kernel=os.uname().release, hostname=socket.gethostname(),
+                temperature=_temperature(), undervoltage=_undervoltage(),
+                disk=dict(total=disk.total, free=disk.free), memory=_memory(),
+                uptime=float(_read('/proc/uptime').split()[0]), address=host_address(),
+                time_synced=time_synced, release=_read('/etc/station-release'), admin=VERSION)
+
+
 def _memory():
     values = {}
     with open('/proc/meminfo') as stream:
@@ -133,26 +193,16 @@ def read():
     log = common.run(['journalctl', '-u', 'weewx', '-n', '300', '-o', 'cat', '--no-pager'],
                      20).stdout.splitlines()
     if not enabled:
-        message = 'Choose your station on the Station page.'
+        message = N_('Choose your station on the Station page.')
     elif not synced:
-        message = 'Waiting for the correct time from the internet. WeeWX starts after that.'
+        message = N_('Waiting for the correct time from the internet. WeeWX starts after that.')
     elif state != 'active':
-        message = 'WeeWX is not running. See the log.'
+        message = N_('WeeWX is not running. See the log.')
     else:
         message = reception_message(log)
         # Most drivers log nothing per reading, so readings are the proof.
         if live() and (message is None or message.startswith('Waiting for the first')):
-            message = 'Receiving your station.'
-        message = message or 'Waiting for the first readings from your station.'
-    disk = shutil.disk_usage(os.path.dirname(common.DATABASE_PATH))
-    try:
-        with open('/etc/station-release') as stream:
-            release = stream.read().strip()
-    except OSError:
-        release = None
-    return dict(message=message, weewx=state, configured=enabled, time_synced=synced,
-                record=last_record(), live=live(), log='\n'.join(log[-40:]),
-                address=host_address(), now=time.time(),
-                disk=dict(total=disk.total, free=disk.free), memory=_memory(),
-                temperature=_temperature(), release=release,
-                uptime=float(open('/proc/uptime').read().split()[0]))
+            message = N_('Receiving your station.')
+        message = message or N_('Waiting for the first readings from your station.')
+    return dict(message=_(message), weewx=state, configured=enabled, record=last_record(),
+                live=live(), log='\n'.join(log[-40:]), now=time.time(), raspberry=raspberry(synced))

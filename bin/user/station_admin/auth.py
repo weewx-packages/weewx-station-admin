@@ -10,6 +10,7 @@ import threading
 import time
 
 from user.station_admin import common
+from user.station_admin.i18n import _
 
 SESSION_SECONDS = 12 * 3600
 # Sessions and failures live only in memory, so they count on a clock that never jumps. A
@@ -49,7 +50,7 @@ def set_password(password):
         ValueError: The password is too short.
     """
     if len(password) < MINIMUM_LENGTH:
-        raise ValueError('The password needs at least %d characters.' % MINIMUM_LENGTH)
+        raise ValueError(_('The password needs at least {count} characters.', count=MINIMUM_LENGTH))
     salt = secrets.token_bytes(16)
     os.makedirs(common.STATE_DIR, exist_ok=True)
     temporary = _password_path() + '.new'
