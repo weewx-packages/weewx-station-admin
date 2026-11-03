@@ -452,6 +452,15 @@ def test_a_skin_setting_overrides_skin_conf_from_weewx_conf(station):
         forms.apply(config, '', [dict(path=['ExtensionRepositories'], name='url', value='x')])
 
 
+def test_readings_carry_the_names_seasons_gives_them(station, monkeypatch):
+    (station / 'etc/skins/Seasons/lang').mkdir(parents=True)
+    (station / 'etc/skins/Seasons/lang/de.conf').write_text(
+        '[Labels]\n    [[Generic]]\n        outTemp = Außentemperatur\n', encoding='utf-8')
+    monkeypatch.setattr(status, '_labels', {})
+    assert status.observation_labels('de') == {'outTemp': 'Außentemperatur'}
+    assert status.observation_labels('fr') == {}
+
+
 def test_readings_follow_the_units_of_the_weather_pages():
     config = configobj.ConfigObj({'StdReport': {'Defaults': {'unit_system': 'metricwx'}}})
     converter, formatter = live.report_units(config)

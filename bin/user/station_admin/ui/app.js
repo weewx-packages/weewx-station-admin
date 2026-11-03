@@ -171,32 +171,38 @@ const views = {
         [t('Records'), status.record ? status.record.rows.toLocaleString(locale) : '0'],
       ];
       const power = pi.undervoltage === null ? '-' : pi.undervoltage ? t('Too weak') : t('OK');
-      const raspberry = [
-        [t('Model'), pi.model || '-'],
+      // What can need attention is a tile; what only describes the Pi is a line below.
+      const health = [
         [t('Processor temperature'), pi.temperature === null ? '-' : pi.temperature.toLocaleString(locale, {maximumFractionDigits: 1}) + ' °C'],
         [t('Power supply'), power, pi.undervoltage],
         [t('Free disk'), t('{free} of {total}', {free: size(pi.disk.free), total: size(pi.disk.total)})],
         [t('Free memory'), t('{free} of {total}', {free: size(pi.memory.available), total: size(pi.memory.total)})],
         [t('Running for'), duration(pi.uptime)],
-        [t('Time'), pi.time_synced ? t('synchronized') : t('waiting')],
+      ];
+      const details = [
+        [t('Model'), pi.model || '-'],
         [t('Address'), pi.address || '-'],
         [t('Host name'), pi.hostname],
+        [t('Time'), pi.time_synced ? t('synchronized') : t('waiting')],
         [t('System'), pi.system || '-'],
         [t('Kernel'), pi.kernel],
         [t('Image'), pi.release || '-'],
         [t('Administration'), pi.admin],
       ];
-      const tiles = list => el('div', {class: 'tiles'}, list.map(([name, value, bad]) =>
-        el('div', {class: bad ? 'tile bad' : 'tile'}, el('b', {text: String(value)}), el('span', {text: name}))));
-      const live = status.live ? Object.entries(status.live).filter(([name]) => !['dateTime', 'usUnits'].includes(name)) : [];
+      const tiles = (list, kind = 'tiles') => el('div', {class: kind}, list.map(([name, value, bad, hint]) =>
+        el('div', {class: bad ? 'tile bad' : 'tile', title: hint || null}, el('b', {text: String(value)}), el('span', {text: name}))));
+      // A reading carries the name the weather pages give it, and its WeeWX name on hover.
+      const live = status.live ? Object.entries(status.live).filter(([name]) => !['dateTime', 'usUnits'].includes(name))
+        .map(([name, text]) => [status.labels[name] || name, text, false, name]) : [];
       show(
-        el('p', {class: 'message', text: status.message}),
+        el('p', {class: 'message ' + (status.weewx === 'active' ? 'good' : 'warn'), text: status.message}),
         tiles(station),
         live.length ? el('h2', {text: t('Current readings')}) : null,
-        live.length ? tiles(live.map(([name, text]) => [name, text])) : null,
+        live.length ? tiles(live, 'tiles readings') : null,
         el('h2', {text: 'Raspberry Pi'}),
         pi.undervoltage ? el('p', {class: 'error', text: t('The power supply is too weak right now. This can corrupt the memory card. Use the official power supply for your model of Raspberry Pi.')}) : null,
-        tiles(raspberry),
+        tiles(health),
+        el('dl', {class: 'card facts'}, details.map(([name, value]) => el('div', {}, el('dt', {text: name}), el('dd', {text: String(value)})))),
         el('h2', {text: t('Log')}), el('pre', {text: status.log}));
     };
     await draw();
@@ -243,7 +249,7 @@ const views = {
     location.querySelector('input').addEventListener('input', event => {
       if (!titleTyped) title.querySelector('input').value = event.target.value;
     });
-    const form = el('form', {onsubmit: event => {
+    const form = el('form', {class: 'card', onsubmit: event => {
       event.preventDefault();
       act('station', values(form), () => { select_tab('Status'); });
     }},
@@ -412,7 +418,7 @@ const views = {
     show(
       data.error ? el('p', {class: 'error', text: data.error}) : null,
       el('h2', {text: t('Installed')}),
-      el('table', {}, el('thead', {}, el('tr', {}, [t('Name'), t('Version'), t('Source'), ''].map(text => el('th', {text})))),
+      data.installed.length === 0 ? el('p', {class: 'note', text: t('No extensions are installed, or the package manager cannot list them.')}) : el('table', {}, el('thead', {}, el('tr', {}, [t('Name'), t('Version'), t('Source'), ''].map(text => el('th', {text})))),
         el('tbody', {}, data.installed.map(item => {
           const managed = item.source !== '-';
           return el('tr', {}, el('td', {text: item.name}), el('td', {text: item.version}), el('td', {text: item.source}),
@@ -541,20 +547,20 @@ function showLogin() {
   tabs.hidden = true;
   logout.hidden = true;
   const password = el('input', {type: 'password', required: true, autocomplete: 'current-password'});
-  const form = el('form', {onsubmit: async event => {
+  const form = el('form', {class: 'card narrow', onsubmit: async event => {
     event.preventDefault();
     try {
       await api('login', {password: password.value});
       showApplication('Status');
     } catch (error) { failure(error); }
-  }}, el('label', {text: t('Password')}, password), el('div', {class: 'row'}, el('button', {text: t('Log in')})));
+  }}, el('h2', {text: t('Log in')}), el('label', {text: t('Password')}, password), el('div', {class: 'row'}, el('button', {text: t('Log in')})));
   show(form);
 }
 
 function showFirstStart() {
   const first = el('input', {type: 'password', required: true, minlength: 8, autocomplete: 'new-password'});
   const second = el('input', {type: 'password', required: true, autocomplete: 'new-password'});
-  const form = el('form', {onsubmit: async event => {
+  const form = el('form', {class: 'card narrow', onsubmit: async event => {
     event.preventDefault();
     if (first.value !== second.value) { failure(new Error(t('The passwords differ.'))); return; }
     try {

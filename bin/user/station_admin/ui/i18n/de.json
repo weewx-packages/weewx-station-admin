@@ -305,5 +305,6 @@
  "Apply the settings": "Einstellungen übernehmen",
  "The weather pages need a title.": "Die Wetterseiten brauchen einen Titel.",
  "Set the title of the weather pages to {title}.": "Titel der Wetterseiten auf {title} gesetzt.",
- "Title of the weather pages": "Titel der Wetterseiten"
+ "Title of the weather pages": "Titel der Wetterseiten",
+ "No extensions are installed, or the package manager cannot list them.": "Keine Erweiterungen installiert, oder der Paketmanager kann sie nicht auflisten."
 }
