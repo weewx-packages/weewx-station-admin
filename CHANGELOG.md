@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+Install an extension from a link under Extensions. A GitHub repository installs its
+newest release, or its main branch if it has none. A link to a release, a branch or a
+.zip or .tar.gz file installs exactly that. WeeWX's own installer does the work. A link
+to a package of a catalog installs from the catalog.
+
+Add, switch off and remove further catalogs under Extensions. The catalog list shows
+the packages of every catalog that is on.
+
 ## 0.1.0a8 - 2026-11-03
 
 A login survives a restart of the administration, such as after an update. A reboot

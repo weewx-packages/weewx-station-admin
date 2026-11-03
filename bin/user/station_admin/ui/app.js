@@ -312,6 +312,8 @@ const views = {
     const data = await api('extensions');
     const redraw = () => select_tab('Extensions');
     const installed = new Set(data.installed.map(item => item.status.split('/').pop().trim()));
+    // The column of the catalog only helps when there is more than one.
+    const several = data.repositories.filter(source => source.enabled).length > 1;
     const filter = el('input', {placeholder: t('Search the catalog')});
     const results = el('tbody');
     const draw = () => {
@@ -321,12 +323,17 @@ const views = {
         .slice(0, 60)
         .map(item => el('tr', {},
           el('td', {}, el('b', {text: item.name}), el('div', {class: 'note', text: item.description})),
+          several ? el('td', {text: item.repo}) : null,
           el('td', {text: item.category}), el('td', {text: item.version}),
-          el('td', {}, installed.has(item.id) ? t('installed') : el('button', {text: t('Install'), onclick: () => act('extensions', {action: 'install', name: item.id}, redraw)})))));
+          el('td', {}, installed.has(item.id) ? t('installed') : el('button', {text: t('Install'), onclick: () => act('extensions', {action: 'install', name: item.id, repo: item.repo}, redraw)})))));
     };
     filter.addEventListener('input', draw);
     draw();
     const upload = el('input', {type: 'file', accept: '.zip,.gz,.tgz'});
+    const link = el('input', {placeholder: 'https://github.com/owner/repository'});
+    const alias = el('input', {placeholder: t('Name, such as my-catalog'), required: true});
+    const address = el('input', {placeholder: 'https://example.org/repository.json', required: true});
+    const repository = action => source => act('extensions', {action, alias: source.alias}, redraw);
     show(
       data.error ? el('p', {class: 'error', text: data.error}) : null,
       el('h2', {text: t('Installed')}),
@@ -339,12 +346,25 @@ const views = {
               el('button', {class: 'danger', text: t('Remove'), onclick: () => { if (confirm(t('Remove {name}?', {name: item.name}))) act('extensions', {action: 'remove', name: item.name}, redraw); }})));
         }))),
       el('div', {class: 'row'}, el('button', {text: t('Update everything'), onclick: () => act('extensions', {action: 'update-all'}, redraw)})),
+      el('h2', {text: t('Install from a link')}),
+      el('p', {class: 'note', text: t('A GitHub repository installs its newest release, or its main branch if it has no release. A link to a release, a branch or a .zip or .tar.gz file installs exactly that. A package of a catalog installs from the catalog, so it gets updates there.')}),
+      el('form', {class: 'row', onsubmit: event => { event.preventDefault(); act('extensions', {action: 'install-link', link: link.value}, redraw); }},
+        link, el('button', {text: t('Install')})),
       el('h2', {text: t('Upload an extension')}),
       el('p', {class: 'note', text: t('Installers run on this station, so install only what you trust.')}),
       el('div', {class: 'row'}, upload, el('button', {text: t('Install the file'), onclick: () => {
         if (upload.files[0]) act('extensions/upload?name=' + encodeURIComponent(upload.files[0].name), upload.files[0], redraw);
       }})),
-      el('h2', {text: t('Catalog')}), filter, el('table', {}, results));
+      el('h2', {text: t('Catalog')}), filter,
+      el('table', {}, el('thead', {}, el('tr', {}, [t('Name'), several ? t('Catalog') : null, t('Type'), t('Version'), ''].filter(text => text !== null).map(text => el('th', {text})))), results),
+      el('h2', {text: t('Catalogs')}),
+      el('table', {}, el('thead', {}, el('tr', {}, [t('Name'), t('Address'), t('On'), ''].map(text => el('th', {text})))),
+        el('tbody', {}, data.repositories.map(source => el('tr', {},
+          el('td', {text: source.alias}), el('td', {text: source.url}),
+          el('td', {}, el('input', {type: 'checkbox', checked: source.enabled, disabled: source.main, onchange: event => repository(event.target.checked ? 'repo-enable' : 'repo-disable')(source)})),
+          el('td', {}, source.main ? null : el('button', {class: 'danger', text: t('Remove'), onclick: () => { if (confirm(t('Remove {name}?', {name: source.alias}))) repository('repo-remove')(source); }})))))),
+      el('form', {class: 'row', onsubmit: event => { event.preventDefault(); act('extensions', {action: 'repo-add', alias: alias.value, url: address.value}, redraw); }},
+        alias, address, el('button', {text: t('Add catalog')})));
   },
 
   async Reports() {
