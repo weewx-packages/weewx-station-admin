@@ -15,7 +15,7 @@ import urllib.parse
 import uuid
 
 from user.station_admin import (VERSION, auth, backups, common, database, drivers, extensions, i18n,
-                                jobs, services, settings, status)
+                                jobs, links, services, settings, status)
 from user.station_admin.i18n import _
 
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
@@ -154,11 +154,10 @@ def post_database(handler, body):
 
 
 def get_extensions(handler):
-    try:
-        catalog, error = extensions.catalog(), None
-    except OSError as problem:
-        catalog, error = [], _('The catalog cannot be read: {error}', error=problem)
-    return dict(installed=extensions.installed(), catalog=catalog, error=error)
+    config = settings.load()
+    catalog, errors = extensions.catalog(config)
+    return dict(installed=extensions.installed(), catalog=catalog,
+                repositories=extensions.repositories(config), error=' '.join(errors) or None)
 
 
 def post_extensions(handler, body):
@@ -166,7 +165,21 @@ def post_extensions(handler, body):
     name = str(body.get('name', ''))
     try:
         if action == 'install':
-            return _start(_('Install {name}', name=name), extensions.install_steps(name))
+            repo = str(body.get('repo') or extensions.MAIN)
+            return _start(_('Install {name}', name=name), extensions.install_steps(name, repo))
+        if action == 'install-link':
+            link = str(body.get('link', '')).strip()
+            if not link:
+                raise ValueError(_('Enter a link.'))
+            package = links.catalog_package(link, extensions.catalog(settings.load())[0])
+            if package:
+                return _start(_('Install {name}', name=package['id']),
+                              extensions.install_steps(package['id'], package['repo']))
+            return _start(_('Install from {link}', link=link),
+                          [links.install_step(link), common.privileged('weewx-restart')])
+        if action in ('repo-add', 'repo-enable', 'repo-disable', 'repo-remove'):
+            return _start(_('Change the catalogs'), extensions.repository_steps(
+                action[len('repo-'):], str(body.get('alias', '')), body.get('url')))
         if action == 'update':
             return _start(_('Update {name}', name=name), extensions.update_steps(name))
         if action == 'update-all':

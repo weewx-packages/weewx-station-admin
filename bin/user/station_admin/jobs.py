@@ -63,7 +63,16 @@ class Job:
         return fields
 
 
-def _run_command(job, command):
+def run_command(job, command):
+    """Run a command and add its output to the log of a job.
+
+    Args:
+        job (Job): The job.
+        command (list[str]): The command.
+
+    Raises:
+        RuntimeError: The command failed.
+    """
     job.write('$ ' + ' '.join(command))
     environment = dict(os.environ, PYTHONPATH=common.PYTHON_PATH)
     process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -88,7 +97,7 @@ def _step(job, step):
     if callable(step):
         step(job)
     else:
-        _run_command(job, step)
+        run_command(job, step)
 
 
 def _work(job, steps, cleanup):

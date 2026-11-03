@@ -26,6 +26,12 @@ requirements, and the install, update and removal commands.
 The administration has no options. It listens on port 8377 of the loopback
 interface, and nginx forwards `/admin/` to it from the local network only.
 
+Under **Extensions**, a link installs an extension with `weectl extension install`:
+a GitHub repository (its newest release, or its main branch without one), one of its
+releases or branches, or a `.zip` or `.tar.gz` file. A link to a package of a catalog
+installs from that catalog, which keeps it updatable. Further catalogs can be added
+there too.
+
 The page is in English and German. It starts in the first language of the browser it
 knows, and the menu at the top switches it for that browser.
 

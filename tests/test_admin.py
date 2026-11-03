@@ -18,7 +18,7 @@ import configobj
 import pytest
 
 from user.station_admin import (auth, backups, common, database, drivers, extensions, i18n, jobs,
-                                 live, server, services, settings, status)
+                                 links, live, server, services, settings, status)
 
 CONFIG = """
 [Station]
@@ -139,7 +139,7 @@ def test_language_sets_both_options_of_belchertown(station):
 
 
 def _steps_of(driver, monkeypatch, **options):
-    monkeypatch.setattr(extensions, '_debian_packages', lambda package_id: [['apt', package_id]])
+    monkeypatch.setattr(extensions, '_debian_packages', lambda package_id, repo: [['apt', package_id]])
     return settings.station_steps(dict(location='Garden', latitude=52.5, longitude=13.4,
                                        altitude=34.0, altitude_unit='meter', units='metricwx',
                                        timezone='Europe/Berlin', driver=driver, options=options,
@@ -371,6 +371,51 @@ def test_a_new_password_ends_the_other_sessions(station):
     assert auth.session_valid(mine) and not auth.session_valid(other)
 
 
+GITHUB = {
+    'repos/a/released/releases/latest': dict(tag_name='v2', assets=[
+        dict(name='notes.txt', browser_download_url='x'),
+        dict(name='released-2.zip', browser_download_url='https://example.org/released-2.zip')]),
+    'repos/a/early/releases?per_page=1': [dict(tag_name='v1a1', assets=[])],
+    'repos/a/plain': dict(default_branch='master'),
+}
+
+
+def test_a_link_becomes_the_archive_it_stands_for(monkeypatch):
+    monkeypatch.setattr(links, '_github', GITHUB.get)
+    assert links.archive_url('https://github.com/a/released/')[0] == \
+        'https://example.org/released-2.zip'
+    assert links.archive_url('a/early')[0] == \
+        'https://github.com/a/early/archive/refs/tags/v1a1.tar.gz'
+    assert links.archive_url('https://github.com/a/plain.git?tab=readme')[0] == \
+        'https://github.com/a/plain/archive/refs/heads/master.tar.gz'
+    assert links.archive_url('https://github.com/a/plain/tree/dev')[0] == \
+        'https://github.com/a/plain/archive/dev.tar.gz'
+    assert links.archive_url('https://example.org/x.tar.gz')[0] == 'https://example.org/x.tar.gz'
+    with pytest.raises(ValueError):
+        links.archive_url('https://example.org/page.html')
+    home = 'https://github.com/weewx-packages/weewx-wll'
+    packages = [dict(id='wll', repo='packages', homepage=home)]
+    assert links.catalog_package(home.replace('weewx-packages', 'Weewx-Packages'),
+                                 packages)['id'] == 'wll'
+    assert links.catalog_package('https://github.com/weewx-packages/weewx-wll/releases/tag/v1',
+                                 packages) is None
+    page = 'https://github.com/weewx-packages/catalog/blob/main/packages/wll.md'
+    assert links.catalog_package(page, packages)['id'] == 'wll'
+
+
+def test_the_catalogs_come_from_the_configuration(station):
+    config = settings.load()
+    config['ExtensionRepositories'] = {'packages': dict(url='https://a', enabled='True'),
+                                       'more': dict(url='https://b', enabled='False')}
+    assert [(item['alias'], item['enabled'], item['main'])
+            for item in extensions.repositories(config)] == \
+        [('packages', True, True), ('more', False, False)]
+    assert extensions.repository_steps('add', 'more', 'https://b')[0][3:7] == \
+        ['repo', 'add', 'more', 'https://b']
+    with pytest.raises(ValueError):
+        extensions.repository_steps('remove', 'packages')
+
+
 def test_readings_follow_the_units_of_the_weather_pages():
     config = configobj.ConfigObj({'StdReport': {'Defaults': {'unit_system': 'metricwx'}}})
     converter, formatter = live.report_units(config)
@@ -392,6 +437,15 @@ def marked_texts():
                     and isinstance(node.args[0], ast.Constant):
                 texts.add(node.args[0].value)
     return texts
+
+
+def test_the_installer_ships_every_file_of_the_package():
+    package = pathlib.Path(i18n.__file__).parent
+    installer = (package.parents[2] / 'install.py').read_text()
+    shipped = set(re.findall(r"'([\w.-]+\.(?:py|js|html|css|json))'", installer))
+    present = {path.name for path in package.rglob('*')
+               if path.is_file() and '__pycache__' not in path.parts}
+    assert present <= shipped, present - shipped
 
 
 def test_every_text_has_a_german_translation():
