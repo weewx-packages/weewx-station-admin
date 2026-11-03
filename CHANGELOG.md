@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a11 - 2026-11-03
 
 A new look: cards, a calmer header with tabs that scroll on a phone, a coloured state
 on the status message, and a dark mode that follows the system. Current readings
