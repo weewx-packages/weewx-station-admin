@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a5 - 2026-11-03
 
 A login no longer ends when the station sets its clock after the start. Saving the
 first settings of a new station failed with "Log in first." for this reason.
