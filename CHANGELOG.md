@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a7 - 2026-11-03
 
 The page is in English and German. It follows the language of the browser, and a menu
 at the top switches it. Messages of the server and of running operations follow the
