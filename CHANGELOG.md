@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+A login survives a restart of the administration, such as after an update. A reboot
+still ends it. Changing the password ends every other login.
+
 ## 0.1.0a7 - 2026-11-03
 
 The page is in English and German. It follows the language of the browser, and a menu
