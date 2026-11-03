@@ -7,6 +7,8 @@ const jobBox = document.getElementById('job');
 const logout = document.getElementById('logout');
 const languageChoice = document.getElementById('language');
 let refreshTimer = null;
+// The form the Settings page shows: '' for weewx.conf, otherwise the name of a report.
+let settingsForm = '';
 // English is the text in this file. Every other language has a file in i18n that
 // translates each English text, and the server translates its messages from the same file.
 const LANGUAGES = {en: 'English', de: 'Deutsch'};
@@ -250,6 +252,70 @@ const views = {
       el('p', {class: 'note', text: t('Dates and numbers follow this language. Belchertown has translated text for German, French, Italian and Catalan, partly; other languages keep English text.')}),
       el('div', {class: 'row'}, el('button', {text: t('Save and start')})));
     show(form);
+  },
+
+  async Settings() {
+    const data = await api('settings?form=' + encodeURIComponent(settingsForm));
+    const skin = settingsForm !== '';
+    const changes = new Map();
+    const rows = [];
+    const choices = Object.fromEntries(data.forms.map(item => [item.key, item.key ? t('Report {name}, skin {skin}', {name: item.key, skin: item.skin}) : 'weewx.conf']));
+    const option = (path, item) => {
+      const key = JSON.stringify([...path, item.name]);
+      const record = change => { changes.set(key, {path, name: item.name, ...change}); };
+      const current = item.value !== null ? item.value : (item.default !== null ? item.default : '');
+      let input;
+      if (item.secret) {
+        input = el('input', {type: 'password', autocomplete: 'new-password', placeholder: item.stored ? t('Stored. Leave empty to keep it.') : ''});
+      } else if (['true', 'false'].includes(current.toLowerCase())) {
+        input = el('select', {}, ['true', 'false'].map(text => el('option', {value: text, text, selected: current.toLowerCase() === text})));
+      } else {
+        input = el('input', {value: current});
+      }
+      input.addEventListener('change', () => record({value: input.value}));
+      const notes = [];
+      if (item.comment) notes.push(el('div', {class: 'note comment', text: item.comment}));
+      if (skin && item.default !== null && !item.secret) notes.push(el('div', {class: 'note', text: t('Skin default: {value}', {value: item.default || '""'})}));
+      // A value in weewx.conf overrides the skin, and dropping it brings the skin's back.
+      const reset = skin && item.value !== null && item.default !== null
+        ? el('button', {type: 'button', class: 'quiet', text: t('Use the default'), onclick: () => {
+          record({reset: true});
+          if (!item.secret) input.value = item.default;
+          reset.disabled = true;
+        }}) : null;
+      const row = el('div', {class: item.value !== null && skin ? 'option changed' : 'option'},
+        el('label', {text: item.name}, el('div', {class: 'row'}, input, reset)), notes);
+      row.dataset.search = (item.name + ' ' + item.comment).toLowerCase();
+      rows.push(row);
+      return row;
+    };
+    const section = (path, tree) => {
+      const inner = [
+        tree.comment ? el('p', {class: 'note comment', text: tree.comment}) : null,
+        tree.options.map(item => option(path, item)),
+        tree.sections.map(child => section([...path, child.name], child))];
+      return path.length ? el('details', {}, el('summary', {text: tree.name}), ...inner) : el('div', {}, ...inner);
+    };
+    const body = section([], data.tree);
+    const search = el('input', {type: 'search', placeholder: t('Search the options')});
+    search.addEventListener('input', () => {
+      const needle = search.value.toLowerCase().trim();
+      for (const row of rows) row.style.display = !needle || row.dataset.search.includes(needle) ? '' : 'none';
+      for (const box of [...body.querySelectorAll('details')].reverse()) {
+        const visible = [...box.querySelectorAll('.option')].some(row => row.style.display !== 'none');
+        box.style.display = visible ? '' : 'none';
+        box.open = Boolean(needle) && visible;
+      }
+    });
+    show(
+      select(t('What to set'), 'form', choices, settingsForm, {onchange: event => { settingsForm = event.target.value; select_tab('Settings'); }}),
+      el('p', {class: 'note', text: skin
+        ? t('These settings are stored in weewx.conf, in the section of the report. They override the skin and stay when the skin is updated.')
+        : t('Options of weewx.conf. Sections and new options are added on the System page.')}),
+      search, body,
+      el('div', {class: 'row sticky'}, el('button', {text: t('Save and restart WeeWX'), onclick: () => {
+        if (changes.size) act('settings', {form: settingsForm, changes: [...changes.values()]}, () => select_tab('Settings'));
+      }})));
   },
 
   async Sensors() {

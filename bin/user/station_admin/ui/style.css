@@ -34,3 +34,9 @@ aside { position: fixed; right: 1rem; bottom: 1rem; width: min(34rem, calc(100vw
 aside pre { max-height: 16rem; overflow-y: auto; }
 .inline { display: flex; align-items: center; gap: .5rem; font-weight: 600; margin-top: .6rem; }
 .row input:not([type=checkbox]):not([type=file]) { flex: 1; width: auto; min-width: 12rem; }
+details { border-left: 2px solid var(--line); padding-left: .8rem; margin: .5rem 0; }
+summary { cursor: pointer; font-weight: 600; padding: .2rem 0; }
+.option { margin-top: .4rem; }
+.option.changed > label { border-left: 3px solid var(--accent); padding-left: .4rem; }
+.comment { white-space: pre-line; }
+.sticky { position: sticky; bottom: 0; background: Canvas; padding: .6rem 0; border-top: 1px solid var(--line); }
